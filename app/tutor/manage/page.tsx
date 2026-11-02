@@ -1,1 +1,428 @@
-"use client";import {useEffect,useState} from "react";import {CalendarPlus,Plus,Trash2} from "lucide-react";import {AppShell} from "@/components/app-shell";import {api,money} from "@/lib/api";import type {Offering,Pricing} from "@/lib/types";import {Card,CardContent,CardHeader,CardTitle} from "@/components/ui/card";import {Field} from "@/components/ui/field";import {Input} from "@/components/ui/input";import {Textarea} from "@/components/ui/textarea";import {Button} from "@/components/ui/button";import {Badge} from "@/components/ui/badge";import {toast} from "sonner";type Slot={id:string;day_of_week:number;start_time:string;end_time:string;timezone:string};export default function TutorManagePage(){const [offerings,setOfferings]=useState<Offering[]>([]);const [pricing,setPricing]=useState<Pricing[]>([]);const [slots,setSlots]=useState<Slot[]>([]);const [title,setTitle]=useState("");const [description,setDescription]=useState("");const [category,setCategory]=useState("SCHOOL_SUBJECT");const [level,setLevel]=useState("PRIMARY");const [offeringId,setOfferingId]=useState("");const [model,setModel]=useState("HOURLY");const [amount,setAmount]=useState("500000");const [scope,setScope]=useState("");const [day,setDay]=useState("0");const [start,setStart]=useState("09:00");const [end,setEnd]=useState("12:00");const [busy,setBusy]=useState(false);async function load(){try{const [o,p,s]=await Promise.all([api<Offering[]>("/tutors/me/offerings"),api<Pricing[]>("/tutors/me/pricing"),api<Slot[]>("/tutors/me/availability")]);setOfferings(o);setPricing(p);setSlots(s);if(!offeringId&&o[0])setOfferingId(o[0].id);}catch(e){toast.error(e instanceof Error?e.message:"Could not load tutor settings");}}useEffect(()=>{load()},[]);async function createOffering(e:React.FormEvent){e.preventDefault();setBusy(true);try{await api("/tutors/me/offerings",{method:"POST",body:JSON.stringify({category,title,description,level})});toast.success("Offering added");setTitle("");setDescription("");load();}catch(e){toast.error(e instanceof Error?e.message:"Could not add offering");}finally{setBusy(false)}}async function addPrice(e:React.FormEvent){e.preventDefault();setBusy(true);try{await api(`/tutors/me/offerings/${offeringId}/pricing`,{method:"POST",body:JSON.stringify({pricing_model:model,amount_minor:Math.round(Number(amount)),currency:"NGN",contract_scope:model==="CONTRACT"?scope:null,estimated_hours:null})});toast.success("Pricing submitted for review");load();}catch(e){toast.error(e instanceof Error?e.message:"Could not submit pricing");}finally{setBusy(false)}}async function addSlot(e:React.FormEvent){e.preventDefault();try{await api("/tutors/me/availability",{method:"POST",body:JSON.stringify({day_of_week:Number(day),start_time:start,end_time:end,timezone:"Africa/Lagos"})});toast.success("Availability added");load();}catch(e){toast.error(e instanceof Error?e.message:"Could not add availability")}}async function removeSlot(id:string){try{await api(`/tutors/me/availability/${id}`,{method:"DELETE"});toast.success("Availability removed");load()}catch(e){toast.error(e instanceof Error?e.message:"Could not remove availability")}}return <AppShell title="Tutor workspace" description="Manage the public offering list, propose pricing for admin review and set weekly availability. Only active approved pricing can be used in tutoring agreements."><div className="grid gap-5 xl:grid-cols-2"><Card><CardHeader><CardTitle>Add a subject or service</CardTitle></CardHeader><CardContent><form onSubmit={createOffering} className="space-y-4"><Field label="Offering title" htmlFor="title"><Input id="title" required minLength={2} maxLength={160} value={title} onChange={e=>setTitle(e.target.value)} placeholder="Primary mathematics"/></Field><div className="form-grid"><Field label="Category" htmlFor="category"><select id="category" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={category} onChange={e=>setCategory(e.target.value)}>{["SCHOOL_SUBJECT","CODING","PROFESSIONAL","LANGUAGE","CREATIVE_SKILL","OTHER"].map(v=><option key={v}>{v}</option>)}</select></Field><Field label="Level" htmlFor="level"><Input id="level" value={level} onChange={e=>setLevel(e.target.value)}/></Field></div><Field label="Description" htmlFor="description"><Textarea id="description" required minLength={10} value={description} onChange={e=>setDescription(e.target.value)} placeholder="Topics covered and your teaching approach"/></Field><Button disabled={busy}><Plus size={16}/> Add offering</Button></form></CardContent></Card><Card><CardHeader><CardTitle>Propose pricing</CardTitle><p className="text-sm text-slate-500">Enter amounts in kobo. ₦5,000 = 500,000 kobo.</p></CardHeader><CardContent><form onSubmit={addPrice} className="space-y-4"><Field label="Offering" htmlFor="offering"><select id="offering" required className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={offeringId} onChange={e=>setOfferingId(e.target.value)}><option value="">Choose offering</option>{offerings.map(o=><option key={o.id} value={o.id}>{o.title}</option>)}</select></Field><Field label="Pricing model" htmlFor="model"><select id="model" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={model} onChange={e=>setModel(e.target.value)}><option value="HOURLY">Hourly</option><option value="CONTRACT">Contract</option></select></Field><Field label="Tutor rate (kobo)" htmlFor="amount"><Input id="amount" type="number" min="1" required value={amount} onChange={e=>setAmount(e.target.value)}/><p className="mt-1 text-xs text-slate-500">Equivalent: {money(Number(amount)||0)}</p></Field>{model==="CONTRACT"&&<Field label="Contract scope" htmlFor="scope"><Textarea id="scope" required value={scope} onChange={e=>setScope(e.target.value)} placeholder="Describe the full contract deliverable"/></Field>}<Button disabled={busy||!offeringId} className="w-full">Submit pricing for review</Button></form></CardContent></Card><Card><CardHeader><CardTitle>My offerings</CardTitle></CardHeader><CardContent>{offerings.length===0?<p className="text-sm text-slate-500">No offerings added yet.</p>:<div className="space-y-3">{offerings.map(o=><div key={o.id} className="rounded-xl border border-slate-100 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-[#102A56]">{o.title}</p><p className="mt-1 text-xs text-slate-500">{o.category} · {o.level}</p></div><Badge className={o.is_active?"":"bg-slate-100 text-slate-500"}>{o.is_active?"Active":"Inactive"}</Badge></div><p className="mt-2 text-sm text-slate-500">{o.description}</p><p className="mt-2 break-all font-mono text-[10px] text-slate-400">{o.id}</p></div>)}</div>}</CardContent></Card><Card><CardHeader><CardTitle>Pricing proposals</CardTitle></CardHeader><CardContent>{pricing.length===0?<p className="text-sm text-slate-500">No pricing proposals yet.</p>:<div className="space-y-3">{pricing.map(p=><div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-4"><div><p className="font-bold text-[#102A56]">{money(p.amount_minor,p.currency)} · {p.pricing_model}</p><p className="mt-1 font-mono text-[10px] text-slate-400">{p.id}</p><p className="mt-1 text-xs text-slate-500">Version {p.version}</p></div><Badge>{p.status}</Badge></div>)}</div>}</CardContent></Card><Card className="xl:col-span-2"><CardHeader><CardTitle className="flex items-center gap-2"><CalendarPlus size={19} className="text-[#0077E6]"/> Weekly availability</CardTitle></CardHeader><CardContent><form onSubmit={addSlot} className="form-grid"><Field label="Day" htmlFor="day"><select id="day" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={day} onChange={e=>setDay(e.target.value)}>{["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d,i)=><option key={d} value={i}>{d}</option>)}</select></Field><Field label="Start time" htmlFor="start"><Input id="start" type="time" value={start} onChange={e=>setStart(e.target.value)}/></Field><Field label="End time" htmlFor="end"><Input id="end" type="time" value={end} onChange={e=>setEnd(e.target.value)}/></Field><div className="flex items-end"><Button><Plus size={16}/> Add time slot</Button></div></form><div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{slots.map(s=><div key={s.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"><div><p className="text-sm font-bold text-[#102A56]">{["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][s.day_of_week]}</p><p className="mt-1 text-xs text-slate-500">{s.start_time.slice(0,5)} – {s.end_time.slice(0,5)}</p></div><button onClick={()=>removeSlot(s.id)} aria-label="Remove slot" className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={15}/></button></div>)}</div></CardContent></Card></div></AppShell>}
+"use client";
+import { useEffect, useState } from "react";
+import { CalendarPlus, Plus, Trash2 } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { api, money } from "@/lib/api";
+import type { Offering, Pricing } from "@/lib/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+type Slot = {
+  id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  timezone: string;
+};
+export default function TutorManagePage() {
+  const [offerings, setOfferings] = useState<Offering[]>([]);
+  const [pricing, setPricing] = useState<Pricing[]>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("SCHOOL_SUBJECT");
+  const [level, setLevel] = useState("PRIMARY");
+  const [offeringId, setOfferingId] = useState("");
+  const [model, setModel] = useState("HOURLY");
+  const [amount, setAmount] = useState("500000");
+  const [scope, setScope] = useState("");
+  const [day, setDay] = useState("0");
+  const [start, setStart] = useState("09:00");
+  const [end, setEnd] = useState("12:00");
+  const [busy, setBusy] = useState(false);
+  async function load() {
+    try {
+      const [o, p, s] = await Promise.all([
+        api<Offering[]>("/tutors/me/offerings"),
+        api<Pricing[]>("/tutors/me/pricing"),
+        api<Slot[]>("/tutors/me/availability"),
+      ]);
+      setOfferings(o);
+      setPricing(p);
+      setSlots(s);
+      if (!offeringId && o[0]) setOfferingId(o[0].id);
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not load tutor settings",
+      );
+    }
+  }
+  useEffect(() => {
+    load();
+  }, []);
+  async function createOffering(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api("/tutors/me/offerings", {
+        method: "POST",
+        body: JSON.stringify({ category, title, description, level }),
+      });
+      toast.success("Offering added");
+      setTitle("");
+      setDescription("");
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not add offering");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function addPrice(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api(`/tutors/me/offerings/${offeringId}/pricing`, {
+        method: "POST",
+        body: JSON.stringify({
+          pricing_model: model,
+          amount_minor: Math.round(Number(amount)),
+          currency: "NGN",
+          contract_scope: model === "CONTRACT" ? scope : null,
+          estimated_hours: null,
+        }),
+      });
+      toast.success("Pricing submitted for review");
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not submit pricing");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function addSlot(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await api("/tutors/me/availability", {
+        method: "POST",
+        body: JSON.stringify({
+          day_of_week: Number(day),
+          start_time: start,
+          end_time: end,
+          timezone: "Africa/Lagos",
+        }),
+      });
+      toast.success("Availability added");
+      load();
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not add availability",
+      );
+    }
+  }
+  async function removeSlot(id: string) {
+    try {
+      await api(`/tutors/me/availability/${id}`, { method: "DELETE" });
+      toast.success("Availability removed");
+      load();
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not remove availability",
+      );
+    }
+  }
+  return (
+    <AppShell
+      title="Tutor workspace"
+      description="Manage the public offering list, propose pricing for admin review and set weekly availability. Only active approved pricing can be used in tutoring agreements."
+    >
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Add a subject or service</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={createOffering} className="space-y-4">
+              <Field label="Offering title" htmlFor="title">
+                <Input
+                  id="title"
+                  required
+                  minLength={2}
+                  maxLength={160}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Primary mathematics"
+                />
+              </Field>
+              <div className="form-grid">
+                <Field label="Category" htmlFor="category">
+                  <select
+                    id="category"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    {[
+                      "SCHOOL_SUBJECT",
+                      "CODING",
+                      "PROFESSIONAL",
+                      "LANGUAGE",
+                      "CREATIVE_SKILL",
+                      "OTHER",
+                    ].map((v) => (
+                      <option key={v}>{v}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Level" htmlFor="level">
+                  <Input
+                    id="level"
+                    value={level}
+                    onChange={(e) => setLevel(e.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label="Description" htmlFor="description">
+                <Textarea
+                  id="description"
+                  required
+                  minLength={10}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Topics covered and your teaching approach"
+                />
+              </Field>
+              <Button disabled={busy}>
+                <Plus size={16} /> Add offering
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Propose pricing</CardTitle>
+            <p className="text-sm text-slate-500">
+              Enter amounts in kobo. ₦5,000 = 500,000 kobo.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={addPrice} className="space-y-4">
+              <Field label="Offering" htmlFor="offering">
+                <select
+                  id="offering"
+                  required
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                  value={offeringId}
+                  onChange={(e) => setOfferingId(e.target.value)}
+                >
+                  <option value="">Choose offering</option>
+                  {offerings.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.title}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Pricing model" htmlFor="model">
+                <select
+                  id="model"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                >
+                  <option value="HOURLY">Hourly</option>
+                  <option value="CONTRACT">Contract</option>
+                </select>
+              </Field>
+              <Field label="Tutor rate (kobo)" htmlFor="amount">
+                <Input
+                  id="amount"
+                  type="number"
+                  min="1"
+                  required
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Equivalent: {money(Number(amount) || 0)}
+                </p>
+              </Field>
+              {model === "CONTRACT" && (
+                <Field label="Contract scope" htmlFor="scope">
+                  <Textarea
+                    id="scope"
+                    required
+                    value={scope}
+                    onChange={(e) => setScope(e.target.value)}
+                    placeholder="Describe the full contract deliverable"
+                  />
+                </Field>
+              )}
+              <Button disabled={busy || !offeringId} className="w-full">
+                Submit pricing for review
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>My offerings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {offerings.length === 0 ? (
+              <p className="text-sm text-slate-500">No offerings added yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {offerings.map((o) => (
+                  <div
+                    key={o.id}
+                    className="rounded-xl border border-slate-100 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-[#102A56]">{o.title}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {o.category} · {o.level}
+                        </p>
+                      </div>
+                      <Badge
+                        className={
+                          o.is_active ? "" : "bg-slate-100 text-slate-500"
+                        }
+                      >
+                        {o.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {o.description}
+                    </p>
+                    <p className="mt-2 break-all font-mono text-[10px] text-slate-400">
+                      {o.id}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Pricing proposals</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pricing.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                No pricing proposals yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {pricing.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-4"
+                  >
+                    <div>
+                      <p className="font-bold text-[#102A56]">
+                        {money(p.amount_minor, p.currency)} · {p.pricing_model}
+                      </p>
+                      <p className="mt-1 font-mono text-[10px] text-slate-400">
+                        {p.id}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Version {p.version}
+                      </p>
+                    </div>
+                    <Badge>{p.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarPlus size={19} className="text-[#0077E6]" /> Weekly
+              availability
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={addSlot} className="form-grid">
+              <Field label="Day" htmlFor="day">
+                <select
+                  id="day"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                  value={day}
+                  onChange={(e) => setDay(e.target.value)}
+                >
+                  {[
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                    "Sunday",
+                  ].map((d, i) => (
+                    <option key={d} value={i}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Start time" htmlFor="start">
+                <Input
+                  id="start"
+                  type="time"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                />
+              </Field>
+              <Field label="End time" htmlFor="end">
+                <Input
+                  id="end"
+                  type="time"
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                />
+              </Field>
+              <div className="flex items-end">
+                <Button>
+                  <Plus size={16} /> Add time slot
+                </Button>
+              </div>
+            </form>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {slots.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-3"
+                >
+                  <div>
+                    <p className="text-sm font-bold text-[#102A56]">
+                      {
+                        [
+                          "Monday",
+                          "Tuesday",
+                          "Wednesday",
+                          "Thursday",
+                          "Friday",
+                          "Saturday",
+                          "Sunday",
+                        ][s.day_of_week]
+                      }
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {s.start_time.slice(0, 5)} – {s.end_time.slice(0, 5)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => removeSlot(s.id)}
+                    aria-label="Remove slot"
+                    className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </AppShell>
+  );
+}

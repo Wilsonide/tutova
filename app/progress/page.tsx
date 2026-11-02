@@ -1,2 +1,165 @@
-"use client";import {useState} from "react";import {ChartNoAxesCombined,ClipboardCheck,Info} from "lucide-react";import {AppShell} from "@/components/app-shell";import {api} from "@/lib/api";import {Card,CardContent,CardHeader,CardTitle} from "@/components/ui/card";import {Field} from "@/components/ui/field";import {Input} from "@/components/ui/input";import {Textarea} from "@/components/ui/textarea";import {Button} from "@/components/ui/button";import {toast} from "sonner";
-export default function ProgressPage(){const [lesson,setLesson]=useState("");const [summary,setSummary]=useState("");const [confidence,setConfidence]=useState("4");const [next,setNext]=useState("");const [concerns,setConcerns]=useState("");const [result,setResult]=useState<unknown>(null);const [busy,setBusy]=useState(false);async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await api(`/learning/lessons/${lesson}/progress-report`,{method:"POST",body:JSON.stringify({progress_summary:summary,confidence_rating:confidence?Number(confidence):null,next_steps:next||null,concerns:concerns||null})});setResult(r);toast.success("Progress report submitted");}catch(e){toast.error(e instanceof Error?e.message:"Could not submit report");}finally{setBusy(false)}}return <AppShell title="Learner progress" description="Record what the learner worked on, how confident they feel, and the next steps. Reports are attached to a lesson and help satisfy the earnings eligibility rule."><div className="mb-5 flex items-start gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4 text-sm leading-6 text-teal-900"><Info size={18} className="mt-0.5 shrink-0"/><p>The backend exposes progress-report submission but currently has no endpoint to list or read existing reports. The form below submits a report for a known lesson ID.</p></div><div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><Card><CardHeader><CardTitle className="flex items-center gap-2"><ClipboardCheck size={20} className="text-[#0077E6]"/> New progress report</CardTitle><p className="text-sm text-slate-500">Keep feedback specific, constructive and focused on learning.</p></CardHeader><CardContent><form onSubmit={submit} className="space-y-5"><Field label="Lesson ID" htmlFor="lesson"><Input id="lesson" required value={lesson} onChange={e=>setLesson(e.target.value)} placeholder="Lesson UUID"/></Field><Field label="Progress summary" htmlFor="summary"><Textarea id="summary" required minLength={5} maxLength={10000} value={summary} onChange={e=>setSummary(e.target.value)} placeholder="What did the learner work on? What improved?"/></Field><Field label="Confidence rating (1–5)" htmlFor="confidence"><select id="confidence" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={confidence} onChange={e=>setConfidence(e.target.value)}><option value="">Not rated</option><option value="1">1 — Needs significant support</option><option value="2">2 — Developing</option><option value="3">3 — Progressing</option><option value="4">4 — Confident</option><option value="5">5 — Very confident</option></select></Field><Field label="Recommended next steps" htmlFor="next"><Textarea id="next" value={next} onChange={e=>setNext(e.target.value)} placeholder="Practice, revision, or goals for the next lesson"/></Field><Field label="Concerns (optional)" htmlFor="concerns"><Textarea id="concerns" value={concerns} onChange={e=>setConcerns(e.target.value)} placeholder="Anything the parent or learner should know"/></Field><Button className="w-full" disabled={busy}>{busy?"Submitting…":"Submit progress report"}</Button></form></CardContent></Card><div className="space-y-5"><Card><CardContent className="p-6"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#E5F8F6] text-[#00AFA0]"><ChartNoAxesCombined size={24}/></div><h3 className="mt-5 text-lg font-black text-[#102A56]">A useful progress note</h3><ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600"><li><b className="text-[#102A56]">Be specific.</b> Mention a skill or concept rather than saying only “good lesson.”</li><li><b className="text-[#102A56]">Show movement.</b> Explain what the learner can do now and what still needs practice.</li><li><b className="text-[#102A56]">Set a next step.</b> Give the next lesson a clear direction.</li></ul></CardContent></Card>{result&&<Card><CardHeader><CardTitle>Report submitted</CardTitle></CardHeader><CardContent><pre className="overflow-auto rounded-xl bg-slate-50 p-3 text-xs">{JSON.stringify(result,null,2)}</pre></CardContent></Card>}</div></div></AppShell>}
+"use client";
+import { useState } from "react";
+import { ChartNoAxesCombined, ClipboardCheck, Info } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { api } from "@/lib/api";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+export default function ProgressPage() {
+  const [lesson, setLesson] = useState("");
+  const [summary, setSummary] = useState("");
+  const [confidence, setConfidence] = useState("4");
+  const [next, setNext] = useState("");
+  const [concerns, setConcerns] = useState("");
+  const [result, setResult] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const r = await api(`/learning/lessons/${lesson}/progress-report`, {
+        method: "POST",
+        body: JSON.stringify({
+          progress_summary: summary,
+          confidence_rating: confidence ? Number(confidence) : null,
+          next_steps: next || null,
+          concerns: concerns || null,
+        }),
+      });
+      setResult(r);
+      toast.success("Progress report submitted");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not submit report");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <AppShell
+      title="Learner progress"
+      description="Record what the learner worked on, how confident they feel, and the next steps. Reports are attached to a lesson and help satisfy the earnings eligibility rule."
+    >
+      <div className="mb-5 flex items-start gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4 text-sm leading-6 text-teal-900">
+        <Info size={18} className="mt-0.5 shrink-0" />
+        <p>
+          The backend exposes progress-report submission but currently has no
+          endpoint to list or read existing reports. The form below submits a
+          report for a known lesson ID.
+        </p>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardCheck size={20} className="text-[#0077E6]" /> New
+              progress report
+            </CardTitle>
+            <p className="text-sm text-slate-500">
+              Keep feedback specific, constructive and focused on learning.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submit} className="space-y-5">
+              <Field label="Lesson ID" htmlFor="lesson">
+                <Input
+                  id="lesson"
+                  required
+                  value={lesson}
+                  onChange={(e) => setLesson(e.target.value)}
+                  placeholder="Lesson UUID"
+                />
+              </Field>
+              <Field label="Progress summary" htmlFor="summary">
+                <Textarea
+                  id="summary"
+                  required
+                  minLength={5}
+                  maxLength={10000}
+                  value={summary}
+                  onChange={(e) => setSummary(e.target.value)}
+                  placeholder="What did the learner work on? What improved?"
+                />
+              </Field>
+              <Field label="Confidence rating (1–5)" htmlFor="confidence">
+                <select
+                  id="confidence"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                  value={confidence}
+                  onChange={(e) => setConfidence(e.target.value)}
+                >
+                  <option value="">Not rated</option>
+                  <option value="1">1 — Needs significant support</option>
+                  <option value="2">2 — Developing</option>
+                  <option value="3">3 — Progressing</option>
+                  <option value="4">4 — Confident</option>
+                  <option value="5">5 — Very confident</option>
+                </select>
+              </Field>
+              <Field label="Recommended next steps" htmlFor="next">
+                <Textarea
+                  id="next"
+                  value={next}
+                  onChange={(e) => setNext(e.target.value)}
+                  placeholder="Practice, revision, or goals for the next lesson"
+                />
+              </Field>
+              <Field label="Concerns (optional)" htmlFor="concerns">
+                <Textarea
+                  id="concerns"
+                  value={concerns}
+                  onChange={(e) => setConcerns(e.target.value)}
+                  placeholder="Anything the parent or learner should know"
+                />
+              </Field>
+              <Button className="w-full" disabled={busy}>
+                {busy ? "Submitting…" : "Submit progress report"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+        <div className="space-y-5">
+          <Card>
+            <CardContent className="p-6">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#E5F8F6] text-[#00AFA0]">
+                <ChartNoAxesCombined size={24} />
+              </div>
+              <h3 className="mt-5 text-lg font-black text-[#102A56]">
+                A useful progress note
+              </h3>
+              <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                <li>
+                  <b className="text-[#102A56]">Be specific.</b> Mention a skill
+                  or concept rather than saying only “good lesson.”
+                </li>
+                <li>
+                  <b className="text-[#102A56]">Show movement.</b> Explain what
+                  the learner can do now and what still needs practice.
+                </li>
+                <li>
+                  <b className="text-[#102A56]">Set a next step.</b> Give the
+                  next lesson a clear direction.
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+          {result !== null && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Report submitted</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="overflow-auto rounded-xl bg-slate-50 p-3 text-xs">
+                  {JSON.stringify(result, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}

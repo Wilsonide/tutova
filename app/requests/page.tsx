@@ -1,2 +1,290 @@
-"use client";import {useEffect,useState} from "react";import Link from "next/link";import {ArrowRight,CalendarClock,Check,Clock,MessageCircle,Plus,UserRound,X} from "lucide-react";import {AppShell} from "@/components/app-shell";import {api} from "@/lib/api";import type {TutoringRequest} from "@/lib/types";import {Button} from "@/components/ui/button";import {Card,CardContent} from "@/components/ui/card";import {Badge} from "@/components/ui/badge";import {Input} from "@/components/ui/input";import {Field} from "@/components/ui/field";import {Textarea} from "@/components/ui/textarea";import {useAuth} from "@/components/providers";import {toast} from "sonner";
-export default function RequestsPage(){const {user}=useAuth();const [rows,setRows]=useState<TutoringRequest[]>([]);const [loading,setLoading]=useState(true);const [show,setShow]=useState(false);const [requestId,setRequestId]=useState("");const [response,setResponse]=useState("ACCEPTED");const [note,setNote]=useState("");const [tutorId,setTutorId]=useState("");const [offeringId,setOfferingId]=useState("");const [learner,setLearner]=useState("");const [learnerType,setLearnerType]=useState("CHILD");const [mode,setMode]=useState("ONLINE");const [goals,setGoals]=useState("");const [start,setStart]=useState("");async function load(){setLoading(true);try{setRows(await api<TutoringRequest[]>("/learning/tutoring-requests/me"));}catch(e){toast.error(e instanceof Error?e.message:"Could not load requests");}finally{setLoading(false)}}useEffect(()=>{load();const params=new URLSearchParams(window.location.search);const t=params.get("tutor");const o=params.get("offering");if(t)setTutorId(t);if(o)setOfferingId(o);if(params.get("new")==="1"||t)setShow(true);},[]);async function create(e:React.FormEvent){e.preventDefault();try{await api("/learning/tutoring-requests",{method:"POST",body:JSON.stringify({tutor_id:tutorId,offering_id:offeringId,learner_type:learnerType,learner_display_name:learner||null,learning_goals:goals,preferred_mode:mode,requested_start:start?new Date(start).toISOString():null})});toast.success("Tutoring request sent");setShow(false);load();}catch(e){toast.error(e instanceof Error?e.message:"Request failed");}}async function respond(e:React.FormEvent){e.preventDefault();try{await api(`/learning/tutoring-requests/${requestId}/response`,{method:"PATCH",body:JSON.stringify({status:response,tutor_response:note||null})});toast.success("Request response saved");setRequestId("");load();}catch(e){toast.error(e instanceof Error?e.message:"Could not respond");}}return <AppShell title="Tutoring requests" description="Parents and adult learners can request a specific tutor. Tutors can accept or decline requests that are awaiting a response."><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">{loading?"Loading requests…":`${rows.length} request${rows.length===1?"":"s"}`}</p>{(user?.role==="PARENT"||user?.role==="LEARNER")&&<Button onClick={()=>setShow(!show)}><Plus size={16}/>{show?"Close form":"New request"}</Button>}</div>{show&&<Card className="mb-6"><CardContent className="p-6"><h2 className="mb-5 text-lg font-black text-[#102A56]">Request a tutor</h2><form onSubmit={create} className="form-grid"><Field label="Tutor ID" htmlFor="tutorId" help="Choose a published tutor in Discover and copy their ID if needed."><Input id="tutorId" required value={tutorId} onChange={e=>setTutorId(e.target.value)} placeholder="Tutor UUID"/></Field><Field label="Offering ID" htmlFor="offeringId"><Input id="offeringId" required value={offeringId} onChange={e=>setOfferingId(e.target.value)} placeholder="Tutor offering UUID"/></Field><Field label="Learner type" htmlFor="learnerType"><select id="learnerType" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={learnerType} onChange={e=>setLearnerType(e.target.value)}><option value="CHILD">Child (parent account)</option><option value="ADULT">Adult learner</option></select></Field><Field label="Learner's display name" htmlFor="learner"><Input id="learner" value={learner} onChange={e=>setLearner(e.target.value)} placeholder="First name or preferred name"/></Field><Field label="Preferred mode" htmlFor="mode"><select id="mode" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={mode} onChange={e=>setMode(e.target.value)}><option value="ONLINE">Online</option><option value="IN_PERSON">In person</option><option value="HYBRID">Hybrid</option></select></Field><Field label="Preferred start (optional)" htmlFor="start"><Input id="start" type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}/></Field><div className="md:col-span-2"><Field label="Learning goals" htmlFor="goals"><Textarea id="goals" required minLength={5} value={goals} onChange={e=>setGoals(e.target.value)} placeholder="What would you like the tutor to help with?"/></Field></div><div className="md:col-span-2"><Button type="submit">Send request <ArrowRight size={16}/></Button></div></form></CardContent></Card>}{rows.length===0&&!loading?<Card><CardContent className="py-14 text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#EAF3FF] text-[#0077E6]"><MessageCircle size={22}/></div><h2 className="mt-4 font-bold text-[#102A56]">No requests yet</h2><p className="mt-2 text-sm text-slate-500">Your tutoring requests will appear here as you connect with tutors.</p><Button className="mt-5" asChild><Link href="/discover">Explore tutors</Link></Button></CardContent></Card>:<div className="space-y-3">{rows.map(r=><Card key={r.id}><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#EAF3FF] text-[#0077E6]"><UserRound size={20}/></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-[#102A56]">{r.learner_display_name||"Tutoring request"}</h3><Badge>{r.status}</Badge></div><p className="mt-1 text-sm text-slate-500">{r.learning_goals}</p><p className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400"><span>{r.learner_type}</span><span>{r.preferred_mode?.replace("_"," ")}</span><span>ID: {r.id}</span></p></div>{user?.role==="TUTOR"&&r.status==="REQUESTED"&&<Button variant="outline" onClick={()=>setRequestId(requestId===r.id?"":r.id)}><MessageCircle size={15}/> Respond</Button>}</CardContent>{requestId===r.id&&<CardContent className="border-t border-slate-100 bg-slate-50 p-5"><form onSubmit={respond} className="form-grid"><Field label="Response" htmlFor="response"><select id="response" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={response} onChange={e=>setResponse(e.target.value)}><option value="ACCEPTED">Accept request</option><option value="DECLINED">Decline request</option></select></Field><Field label="Note (optional)" htmlFor="note"><Input id="note" value={note} onChange={e=>setNote(e.target.value)} placeholder="A short message to the parent"/></Field><div><Button type="submit"><Check size={15}/> Submit response</Button></div></form></CardContent>}</Card>)}</div>}</AppShell>}
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  CalendarClock,
+  Check,
+  Clock,
+  MessageCircle,
+  Plus,
+  UserRound,
+  X,
+} from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { api } from "@/lib/api";
+import type { TutoringRequest } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/components/providers";
+import { toast } from "sonner";
+export default function RequestsPage() {
+  const { user } = useAuth();
+  const [rows, setRows] = useState<TutoringRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [show, setShow] = useState(false);
+  const [requestId, setRequestId] = useState("");
+  const [response, setResponse] = useState("ACCEPTED");
+  const [note, setNote] = useState("");
+  const [tutorId, setTutorId] = useState("");
+  const [offeringId, setOfferingId] = useState("");
+  const [learner, setLearner] = useState("");
+  const [learnerType, setLearnerType] = useState("CHILD");
+  const [mode, setMode] = useState("ONLINE");
+  const [goals, setGoals] = useState("");
+  const [start, setStart] = useState("");
+  async function load() {
+    setLoading(true);
+    try {
+      setRows(await api<TutoringRequest[]>("/learning/tutoring-requests/me"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not load requests");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    load();
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("tutor");
+    const o = params.get("offering");
+    if (t) setTutorId(t);
+    if (o) setOfferingId(o);
+    if (params.get("new") === "1" || t) setShow(true);
+  }, []);
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await api("/learning/tutoring-requests", {
+        method: "POST",
+        body: JSON.stringify({
+          tutor_id: tutorId,
+          offering_id: offeringId,
+          learner_type: learnerType,
+          learner_display_name: learner || null,
+          learning_goals: goals,
+          preferred_mode: mode,
+          requested_start: start ? new Date(start).toISOString() : null,
+        }),
+      });
+      toast.success("Tutoring request sent");
+      setShow(false);
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Request failed");
+    }
+  }
+  async function respond(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await api(`/learning/tutoring-requests/${requestId}/response`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: response,
+          tutor_response: note || null,
+        }),
+      });
+      toast.success("Request response saved");
+      setRequestId("");
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not respond");
+    }
+  }
+  return (
+    <AppShell
+      title="Tutoring requests"
+      description="Parents and adult learners can request a specific tutor. Tutors can accept or decline requests that are awaiting a response."
+    >
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">
+          {loading
+            ? "Loading requests…"
+            : `${rows.length} request${rows.length === 1 ? "" : "s"}`}
+        </p>
+        {(user?.role === "PARENT" || user?.role === "LEARNER") && (
+          <Button onClick={() => setShow(!show)}>
+            <Plus size={16} />
+            {show ? "Close form" : "New request"}
+          </Button>
+        )}
+      </div>
+      {show && (
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <h2 className="mb-5 text-lg font-black text-[#102A56]">
+              Request a tutor
+            </h2>
+            <form onSubmit={create} className="form-grid">
+              <Field
+                label="Tutor ID"
+                htmlFor="tutorId"
+                help="Choose a published tutor in Discover and copy their ID if needed."
+              >
+                <Input
+                  id="tutorId"
+                  required
+                  value={tutorId}
+                  onChange={(e) => setTutorId(e.target.value)}
+                  placeholder="Tutor UUID"
+                />
+              </Field>
+              <Field label="Offering ID" htmlFor="offeringId">
+                <Input
+                  id="offeringId"
+                  required
+                  value={offeringId}
+                  onChange={(e) => setOfferingId(e.target.value)}
+                  placeholder="Tutor offering UUID"
+                />
+              </Field>
+              <Field label="Learner type" htmlFor="learnerType">
+                <select
+                  id="learnerType"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                  value={learnerType}
+                  onChange={(e) => setLearnerType(e.target.value)}
+                >
+                  <option value="CHILD">Child (parent account)</option>
+                  <option value="ADULT">Adult learner</option>
+                </select>
+              </Field>
+              <Field label="Learner's display name" htmlFor="learner">
+                <Input
+                  id="learner"
+                  value={learner}
+                  onChange={(e) => setLearner(e.target.value)}
+                  placeholder="First name or preferred name"
+                />
+              </Field>
+              <Field label="Preferred mode" htmlFor="mode">
+                <select
+                  id="mode"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                >
+                  <option value="ONLINE">Online</option>
+                  <option value="IN_PERSON">In person</option>
+                  <option value="HYBRID">Hybrid</option>
+                </select>
+              </Field>
+              <Field label="Preferred start (optional)" htmlFor="start">
+                <Input
+                  id="start"
+                  type="datetime-local"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                />
+              </Field>
+              <div className="md:col-span-2">
+                <Field label="Learning goals" htmlFor="goals">
+                  <Textarea
+                    id="goals"
+                    required
+                    minLength={5}
+                    value={goals}
+                    onChange={(e) => setGoals(e.target.value)}
+                    placeholder="What would you like the tutor to help with?"
+                  />
+                </Field>
+              </div>
+              <div className="md:col-span-2">
+                <Button type="submit">
+                  Send request <ArrowRight size={16} />
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+      {rows.length === 0 && !loading ? (
+        <Card>
+          <CardContent className="py-14 text-center">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-[#EAF3FF] text-[#0077E6]">
+              <MessageCircle size={22} />
+            </div>
+            <h2 className="mt-4 font-bold text-[#102A56]">No requests yet</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Your tutoring requests will appear here as you connect with
+              tutors.
+            </p>
+            <Button className="mt-5" asChild>
+              <Link href="/discover">Explore tutors</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((r) => (
+            <Card key={r.id}>
+              <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#EAF3FF] text-[#0077E6]">
+                  <UserRound size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-bold text-[#102A56]">
+                      {r.learner_display_name || "Tutoring request"}
+                    </h3>
+                    <Badge>{r.status}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {r.learning_goals}
+                  </p>
+                  <p className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400">
+                    <span>{r.learner_type}</span>
+                    <span>{r.preferred_mode?.replace("_", " ")}</span>
+                    <span>ID: {r.id}</span>
+                  </p>
+                </div>
+                {user?.role === "TUTOR" && r.status === "REQUESTED" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setRequestId(requestId === r.id ? "" : r.id)}
+                  >
+                    <MessageCircle size={15} /> Respond
+                  </Button>
+                )}
+              </CardContent>
+              {requestId === r.id && (
+                <CardContent className="border-t border-slate-100 bg-slate-50 p-5">
+                  <form onSubmit={respond} className="form-grid">
+                    <Field label="Response" htmlFor="response">
+                      <select
+                        id="response"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                        value={response}
+                        onChange={(e) => setResponse(e.target.value)}
+                      >
+                        <option value="ACCEPTED">Accept request</option>
+                        <option value="DECLINED">Decline request</option>
+                      </select>
+                    </Field>
+                    <Field label="Note (optional)" htmlFor="note">
+                      <Input
+                        id="note"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="A short message to the parent"
+                      />
+                    </Field>
+                    <div>
+                      <Button type="submit">
+                        <Check size={15} /> Submit response
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+    </AppShell>
+  );
+}
