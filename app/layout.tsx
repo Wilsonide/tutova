@@ -1,6 +1,5 @@
-import type { Metadata } from "next";
-// @ts-expect-error CSS imports are handled by Next.js.
 import "./globals.css";
+import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
 import { Toaster } from "sonner";
 export const metadata: Metadata = {

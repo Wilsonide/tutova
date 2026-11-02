@@ -1,3 +1,86 @@
 @import "tailwindcss";
-:root{--background:#f7f9fc;--foreground:#172b4d;--navy:#102a56;--teal:#00a99a;--blue:#1769d2;--surface:#fff;--muted:#68778d;--border:#e5eaf1}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--background);color:var(--foreground);font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}button,input,textarea,select{font:inherit}::selection{background:#baf3ed;color:#102a56}a{transition:color .16s ease,border-color .16s ease,background-color .16s ease}.container-page{margin-inline:auto;width:100%;max-width:1200px;padding-inline:1.25rem}.eyebrow{font-size:.72rem;font-weight:750;letter-spacing:.12em;text-transform:uppercase;color:#1769d2}.soft-grid{background-image:radial-gradient(#b7c9dc 0.7px,transparent 0.7px);background-size:20px 20px}.gradient-hero{background:#102a56}.form-grid{display:grid;grid-template-columns:repeat(1,minmax(0,1fr));gap:1rem}.surface{background:#fff;border:1px solid var(--border);border-radius:18px}.page-heading{font-size:clamp(1.7rem,3vw,2.2rem);font-weight:750;letter-spacing:-.045em;line-height:1.15;color:#102a56}.muted-copy{color:#68778d;line-height:1.7}@media(min-width:768px){.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+:root {
+  --background: #f7f9fc;
+  --foreground: #172b4d;
+  --navy: #102a56;
+  --teal: #00a99a;
+  --blue: #1769d2;
+  --surface: #fff;
+  --muted: #68778d;
+  --border: #e5eaf1;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+::selection {
+  background: #baf3ed;
+  color: #102a56;
+}
+a {
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+.container-page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1200px;
+  padding-inline: 1.25rem;
+}
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #1769d2;
+}
+.soft-grid {
+  background-image: radial-gradient(#b7c9dc 0.7px, transparent 0.7px);
+  background-size: 20px 20px;
+}
+.gradient-hero {
+  background: #102a56;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 1rem;
+}
+.surface {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+.page-heading {
+  font-size: clamp(1.7rem, 3vw, 2.2rem);
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1.15;
+  color: #102a56;
+}
+.muted-copy {
+  color: #68778d;
+  line-height: 1.7;
+}
+@media (min-width: 768px) {
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
