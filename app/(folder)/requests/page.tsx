@@ -313,8 +313,6 @@ function getBookingStatusLabel(status: BookingStatus) {
       return "Under review";
     case "COMPLETED":
       return "Completed";
-    default:
-      return status.replaceAll("_", " ");
   }
 }
 
@@ -747,7 +745,7 @@ export default function RequestsPage() {
       setProfileStatus("loading");
 
       try {
-        if (user.role === "PARENT") {
+        if (user?.role === "PARENT") {
           try {
             await api("/parents/profile");
           } catch {
@@ -757,7 +755,7 @@ export default function RequestsPage() {
           }
         }
 
-        if (user.role === "ADULT_LEARNER") {
+        if (user?.role === "ADULT_LEARNER") {
           try {
             await api("/learners/profile");
           } catch {
