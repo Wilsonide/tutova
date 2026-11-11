@@ -1,0 +1,12 @@
+"use client";
+import { useSearchParams } from "next/navigation";
+import { RequestsRedirect } from "@/components/requests-redirect";
+export default function NewRequestClient() {
+  const params = useSearchParams();
+  return (
+    <RequestsRedirect
+      tutorId={params.get("tutor") || ""}
+      offeringId={params.get("offering") || ""}
+    />
+  );
+}

@@ -1,0 +1,137 @@
+"use client";
+import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LockKeyhole } from "lucide-react";
+import { Brand } from "@/components/brand";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { useAuth } from "@/components/providers";
+import { toast } from "sonner";
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const { signIn } = useAuth();
+  const router = useRouter();
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const user = await signIn(email, password);
+      toast.success("Welcome back");
+      const isAdmin = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+
+      const next =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("next")
+          : null;
+
+      const destination = isAdmin
+        ? "/admin"
+        : next && next.startsWith("/") && !next.startsWith("//")
+          ? next
+          : "/dashboard";
+
+      router.replace(destination);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Unable to sign in");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="grid min-h-screen bg-white lg:grid-cols-2">
+      <section className="hidden flex-col justify-between bg-[#102A56] p-12 text-white lg:flex">
+        <Brand light />
+        <div className="max-w-lg">
+          <div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-white/10 text-[#56E0D4]">
+            <LockKeyhole size={28} />
+          </div>
+          <h1 className="text-4xl font-black leading-tight">
+            Your learning journey, all in one place.
+          </h1>
+          <p className="mt-5 leading-8 text-blue-100">
+            Pick up where you left off. Your lessons, tutor conversations and
+            progress are ready when you are.
+          </p>
+        </div>
+        <p className="text-xs text-blue-200">
+          TUTOVA · The right tutor. A brighter future.
+        </p>
+      </section>
+      <section className="flex items-center justify-center px-5 py-12">
+        <div className="w-full max-w-md">
+          <div className="mb-10 lg:hidden">
+            <Brand />
+          </div>
+          <Link
+            href="/"
+            className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0077E6]"
+          >
+            <ArrowLeft size={16} /> Back to home
+          </Link>
+          <p className="eyebrow">Welcome back</p>
+          <h2 className="mt-3 text-3xl font-black text-[#102A56]">
+            Sign in to Tutova
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            Use the email and password associated with your account.
+          </p>
+          <form onSubmit={submit} className="mt-8 space-y-5">
+            <Field label="Email address" htmlFor="email">
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+              />
+            </Field>
+            <Field label="Password" htmlFor="password">
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={show ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-12"
+                  placeholder="Enter your password"
+                />
+                <button
+                  type="button"
+                  aria-label={show ? "Hide password" : "Show password"}
+                  onClick={() => setShow(!show)}
+                  className="absolute right-3 top-3 text-slate-400"
+                >
+                  {show ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </Field>
+            <Button className="w-full" size="lg" disabled={busy}>
+              {busy ? "Signing you in…" : "Sign in"}
+              <ArrowRight size={17} />
+            </Button>
+          </form>
+          <p className="mt-7 text-center text-sm text-slate-500">
+            New to Tutova?{" "}
+            <Link href="/register" className="font-bold text-[#0077E6]">
+              Create an account
+            </Link>
+          </p>
+          <p className="mt-8 rounded-xl bg-[#F4F8FB] p-3 text-xs leading-5 text-slate-500">
+            Security note: Tutova keeps the refresh token in an HTTP-only
+            cookie. Your short-lived access token stays in memory and is
+            refreshed through the backend.
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -1,0 +1,1 @@
+import type {ReactNode} from "react";import {Label} from "@/components/ui/label";export function Field({label,htmlFor,help,children}:{label:string;htmlFor?:string;help?:string;children:ReactNode}){return <div className="space-y-2"><Label htmlFor={htmlFor}>{label}</Label>{children}{help&&<p className="text-xs leading-5 text-slate-500">{help}</p>}</div>}
