@@ -122,7 +122,11 @@ export default function DashboardPage() {
         setChildrenLoading(true);
       }
 
-      const dashboardRequests = [
+      const dashboardRequests: [
+        Promise<TutoringRequest[]>,
+        Promise<Booking[]>,
+        Promise<NotificationSummary>,
+      ] = [
         api<TutoringRequest[]>(
           isTutor ? "/tutoring-requests/matching" : "/tutoring-requests/mine",
         ),
@@ -678,7 +682,6 @@ export default function DashboardPage() {
                       </div>
 
                       <Badge
-                        variant="outline"
                         className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${getStatusStyle(booking.status)}`}
                       >
                         {formatStatus(booking.status)}
