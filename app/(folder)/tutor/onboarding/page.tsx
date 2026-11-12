@@ -94,7 +94,24 @@ type UploadResponse = {
   profile_picture_url?: string | null;
   introduction_video_url?: string | null;
 };
+type VideoUploadSignatureResponse = {
+  cloud_name: string;
+  api_key: string;
+  timestamp: number;
+  signature: string;
+  public_id: string;
+};
 
+type CloudinaryVideoUploadResponse = {
+  public_id?: string;
+  secure_url?: string;
+  duration?: number;
+  bytes?: number;
+  format?: string;
+  error?: {
+    message?: string;
+  };
+};
 type IdentityDocumentType =
   | "NATIONAL_ID"
   | "PASSPORT"
@@ -1133,44 +1150,115 @@ export default function TutorOnboardingPage() {
   /* Introduction video                                                       */
   /* ------------------------------------------------------------------------ */
 
-  async function handleIntroductionVideo(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  async function handleIntroductionVideo(
+  event: ChangeEvent<HTMLInputElement>,
+) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
 
-    if (!file) return;
+  if (!file) return;
+
+  if (!exists) {
+    toast.error("Create your tutor profile before uploading a video.");
+    return;
+  }
+
+  if (
+    !validateFile(
+      file,
+      ["video/mp4", "video/webm"],
+      100 * 1024 * 1024,
+      "introduction video",
+    )
+  ) {
+    return;
+  }
+
+  setUploading("video");
+
+  try {
+    // Step 1: Ask FastAPI for a signed, tutor-specific Cloudinary upload.
+    const authorization =
+      await api<VideoUploadSignatureResponse>(
+        "/tutors/profile/introduction-video/signature",
+        {
+          method: "POST",
+        },
+      );
+
+    // Step 2: Upload the actual video directly to Cloudinary.
+    // The video does not pass through Vercel or FastAPI.
+    const cloudinaryForm = new FormData();
+
+    cloudinaryForm.append("file", file);
+    cloudinaryForm.append("api_key", authorization.api_key);
+    cloudinaryForm.append(
+      "timestamp",
+      String(authorization.timestamp),
+    );
+    cloudinaryForm.append("public_id", authorization.public_id);
+    cloudinaryForm.append("signature", authorization.signature);
+
+    const cloudinaryResponse = await fetch(
+      `https://api.cloudinary.com/v1_1/${encodeURIComponent(
+        authorization.cloud_name,
+      )}/video/upload`,
+      {
+        method: "POST",
+        body: cloudinaryForm,
+      },
+    );
+
+    const cloudinaryResult =
+      (await cloudinaryResponse.json()) as CloudinaryVideoUploadResponse;
+
+    if (!cloudinaryResponse.ok) {
+      throw new Error(
+        cloudinaryResult.error?.message ??
+          "Cloudinary could not upload your introduction video.",
+      );
+    }
 
     if (
-      !validateFile(
-        file,
-        ["video/mp4", "video/webm"],
-        100 * 1024 * 1024,
-        "introduction video",
-      )
+      !cloudinaryResult.public_id ||
+      cloudinaryResult.public_id !== authorization.public_id
     ) {
-      return;
-    }
-
-    try {
-      const response = await uploadFile(
-        "/tutors/profile/introduction-video",
-        file,
-        "video",
-      );
-
-      if (response.introduction_video_url) {
-        setVideoUrl(response.introduction_video_url);
-      } else {
-        const profile = await api<TutorProfile>("/tutors/profile");
-        setVideoUrl(profile.introduction_video_url ?? null);
-      }
-
-      toast.success("Introduction video uploaded.");
-    } catch (error) {
-      toast.error(
-        getErrorMessage(error, "Could not upload your introduction video."),
+      throw new Error(
+        "The uploaded video could not be verified.",
       );
     }
+
+    // Step 3: Ask FastAPI to verify the Cloudinary asset and save it.
+    // Never save the browser-provided secure_url directly.
+    const response = await api<UploadResponse>(
+      "/tutors/profile/introduction-video/complete",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          public_id: cloudinaryResult.public_id,
+        }),
+      },
+    );
+
+    if (response.introduction_video_url) {
+      setVideoUrl(response.introduction_video_url);
+    } else {
+      const profile = await api<TutorProfile>("/tutors/profile");
+      setVideoUrl(profile.introduction_video_url ?? null);
+    }
+
+    toast.success("Introduction video uploaded successfully.");
+  } catch (error) {
+    toast.error(
+      getErrorMessage(
+        error,
+        "Could not upload your introduction video.",
+      ),
+    );
+  } finally {
+    setUploading(null);
   }
+}
 
   async function removeIntroductionVideo() {
     if (!exists) return;
