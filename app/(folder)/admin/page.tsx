@@ -88,7 +88,21 @@ type AdminTutor = {
   created_at: string;
   verification_status: VerificationStatus | null;
   tutor_profile: AdminTutorProfile | null;
+
+  // Backend-computed completion information
+  profile_completed: boolean;
+  missing_profile_fields: string[];
+
+  verification_completed: boolean;
+  missing_verification_fields: string[];
+
+  ready_for_verification: boolean;
 };
+
+type TutorPane =
+  | "incomplete_profiles"
+  | "incomplete_verification"
+  | "pending_verification";
 
 type AdminTutorList = {
   items: AdminTutor[];
@@ -165,6 +179,33 @@ function statusClass(status: string) {
   }
 }
 
+function formatRequirement(value: string) {
+  const labels: Record<string, string> = {
+    bio: "Biography",
+    qualifications: "Qualifications",
+    teaching_languages: "Teaching languages",
+    learner_age_groups: "Learner age groups",
+    tutoring_modes: "Tutoring modes",
+    subjects: "Subjects",
+    locations: "Teaching locations",
+
+    profile_picture: "Profile picture",
+    identity_document: "Identity document",
+    identity_document_format: "Identity document format",
+    identity_document_type: "Identity document type",
+    introduction_video: "Introduction video",
+    nda_version: "NDA version",
+    nda_accepted_at: "NDA acceptance",
+    submitted_at: "Verification submission",
+    resubmit_verification: "Verification resubmission",
+  };
+
+  return (
+    labels[value] ??
+    value.replaceAll("_", " ").replace(/^./, (char) => char.toUpperCase())
+  );
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -175,8 +216,11 @@ export default function AdminPage() {
   const [refunds, setRefunds] = useState<Refund[]>([]);
 
   const [tutorSearch, setTutorSearch] = useState("");
-  const [tutorStatusFilter, setTutorStatusFilter] = useState("");
-  const [tutorPage, setTutorPage] = useState(1);
+const [tutorStatusFilter, setTutorStatusFilter] = useState("");
+const [tutorPage, setTutorPage] = useState(1);
+
+const [tutorPane, setTutorPane] =
+  useState<TutorPane>("pending_verification");
   const [tutorTotal, setTutorTotal] = useState(0);
   const [tutorTotalPages, setTutorTotalPages] = useState(1);
 
@@ -202,70 +246,99 @@ export default function AdminPage() {
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
   const load = useCallback(
-    async (showRefreshState = false) => {
-      if (showRefreshState) {
-        setRefreshing(true);
+  async (showRefreshState = false) => {
+    if (showRefreshState) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const tutorPaneQuery =
+        tutorPane === "incomplete_profiles"
+          ? "&profile_completion=incomplete"
+          : tutorPane === "incomplete_verification"
+            ? "&profile_completion=complete&verification_completion=incomplete"
+            : "&profile_completion=complete&verification_completion=complete";
+
+      const tutorUrl =
+        `/admin/tutors?page=${tutorPage}&per_page=${PAGE_SIZE}` +
+        (tutorSearch.trim()
+          ? `&search=${encodeURIComponent(tutorSearch.trim())}`
+          : "") +
+        (tutorStatusFilter
+          ? `&status=${encodeURIComponent(tutorStatusFilter)}`
+          : "") +
+        tutorPaneQuery;
+
+      const [
+        verificationResult,
+        payoutResult,
+        tutorResult,
+        refundResult,
+      ] = await Promise.allSettled([
+        api<Verification[]>(
+          "/verification/admin/pending?limit=100",
+        ),
+
+        api<Payout[]>(
+          "/payments/admin/payouts",
+        ),
+
+        api<AdminTutorList>(tutorUrl),
+
+        api<Refund[]>(
+          "/payments/admin/refunds",
+        ),
+      ]);
+
+      const errors: string[] = [];
+
+      if (verificationResult.status === "fulfilled") {
+        setChecks(verificationResult.value);
       } else {
-        setLoading(true);
+        errors.push("verification queue");
       }
 
-      try {
-        const [verificationResult, payoutResult, tutorResult, refundResult] =
-          await Promise.allSettled([
-            api<Verification[]>("/verification/admin/pending?limit=100"),
-            api<Payout[]>("/payments/admin/payouts"),
-            api<AdminTutorList>(
-              `/admin/tutors?page=${tutorPage}&per_page=${PAGE_SIZE}${
-                tutorSearch.trim()
-                  ? `&search=${encodeURIComponent(tutorSearch.trim())}`
-                  : ""
-              }${
-                tutorStatusFilter
-                  ? `&status=${encodeURIComponent(tutorStatusFilter)}`
-                  : ""
-              }`,
-            ),
-            api<Refund[]>("/payments/admin/refunds"),
-          ]);
-
-        const errors: string[] = [];
-
-        if (verificationResult.status === "fulfilled") {
-          setChecks(verificationResult.value);
-        } else {
-          errors.push("verification queue");
-        }
-
-        if (payoutResult.status === "fulfilled") {
-          setPayouts(payoutResult.value);
-        } else {
-          errors.push("payout records");
-        }
-
-        if (tutorResult.status === "fulfilled") {
-          setTutors(tutorResult.value.items);
-          setTutorTotal(tutorResult.value.total);
-          setTutorTotalPages(Math.max(1, tutorResult.value.total_pages));
-        } else {
-          errors.push("tutor directory");
-        }
-
-        if (refundResult.status === "fulfilled") {
-          setRefunds(refundResult.value);
-        } else {
-          errors.push("refund records");
-        }
-
-        if (errors.length) {
-          toast.error(`Could not load: ${errors.join(", ")}.`);
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+      if (payoutResult.status === "fulfilled") {
+        setPayouts(payoutResult.value);
+      } else {
+        errors.push("payout records");
       }
-    },
-    [tutorPage, tutorSearch, tutorStatusFilter],
-  );
+
+      if (tutorResult.status === "fulfilled") {
+        setTutors(tutorResult.value.items);
+        setTutorTotal(tutorResult.value.total);
+        setTutorTotalPages(
+          Math.max(1, tutorResult.value.total_pages),
+        );
+      } else {
+        errors.push("tutor directory");
+      }
+
+      if (refundResult.status === "fulfilled") {
+        setRefunds(refundResult.value);
+      } else {
+        errors.push("refund records");
+      }
+
+      if (errors.length) {
+        toast.error(
+          `Could not load: ${errors.join(", ")}.`,
+        );
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  },
+  [
+    tutorPage,
+    tutorSearch,
+    tutorStatusFilter,
+    tutorPane,
+  ],
+);
 
   useEffect(() => {
     if (isAdmin) {
@@ -711,235 +784,463 @@ export default function AdminPage() {
       </div>
 
       {/* Tutor management */}
-      <section id="tutors" className="scroll-mt-24">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle>Tutor management</CardTitle>
-              <Badge>{tutorTotal} tutors</Badge>
-            </div>
-          </CardHeader>
+      
+{/* Tutor management */}
+<section id="tutors" className="scroll-mt-24">
+  <Card>
+    <CardHeader>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <CardTitle>Tutor management</CardTitle>
+        <Badge>{tutorTotal} tutors</Badge>
+      </div>
+    </CardHeader>
 
-          <CardContent>
-            <div className="mb-5 grid gap-3 md:grid-cols-[1fr_220px_auto]">
-              <Field label="Search tutors">
-                <input
-                  value={tutorSearch}
-                  onChange={(event) => {
-                    setTutorSearch(event.target.value);
-                    setTutorPage(1);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void load(true);
-                  }}
-                  placeholder="Name, email or phone number"
-                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2] focus:ring-2 focus:ring-[#1769D2]/10"
-                />
-              </Field>
+    <CardContent>
+      {/* Tutor completion panes */}
+      <div className="mb-5 grid gap-2 sm:grid-cols-3">
+        <button
+          type="button"
+          onClick={() => {
+            setTutorPage(1);
+            setTutorPane("incomplete_profiles");
+          }}
+          className={`rounded-xl border p-3 text-left transition-colors ${
+            tutorPane === "incomplete_profiles"
+              ? "border-[#1769D2] bg-[#EDF4FF]"
+              : "border-slate-200 bg-white hover:bg-slate-50"
+          }`}
+        >
+          <p className="text-sm font-semibold text-[#102A56]">
+            Incomplete profiles
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Step 1 profile details are missing
+          </p>
+        </button>
 
-              <Field label="Account status">
-                <select
-                  value={tutorStatusFilter}
-                  onChange={(event) => {
-                    setTutorStatusFilter(event.target.value);
-                    setTutorPage(1);
-                  }}
-                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
-                >
-                  <option value="">All statuses</option>
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                  <option value="SUSPENDED">Suspended</option>
-                  <option value="PENDING_VERIFICATION">
-                    Pending verification
-                  </option>
-                </select>
-              </Field>
+        <button
+          type="button"
+          onClick={() => {
+            setTutorPage(1);
+            setTutorPane("incomplete_verification");
+          }}
+          className={`rounded-xl border p-3 text-left transition-colors ${
+            tutorPane === "incomplete_verification"
+              ? "border-[#1769D2] bg-[#EDF4FF]"
+              : "border-slate-200 bg-white hover:bg-slate-50"
+          }`}
+        >
+          <p className="text-sm font-semibold text-[#102A56]">
+            Incomplete verification
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Profile complete, verification outstanding
+          </p>
+        </button>
 
-              <div className="flex items-end">
-                <Button
-                  variant="outline"
-                  disabled={loading || refreshing}
-                  onClick={() => void load(true)}
-                >
-                  Search
-                </Button>
-              </div>
-            </div>
+        <button
+          type="button"
+          onClick={() => {
+            setTutorPage(1);
+            setTutorPane("pending_verification");
+          }}
+          className={`rounded-xl border p-3 text-left transition-colors ${
+            tutorPane === "pending_verification"
+              ? "border-[#1769D2] bg-[#EDF4FF]"
+              : "border-slate-200 bg-white hover:bg-slate-50"
+          }`}
+        >
+          <p className="text-sm font-semibold text-[#102A56]">
+            Ready for verification
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Complete submissions awaiting review
+          </p>
+        </button>
+      </div>
 
-            {loading ? (
-              <p className="py-5 text-sm text-slate-500">Loading tutors...</p>
-            ) : tutors.length ? (
-              <div className="space-y-4">
-                {tutors.map((tutor) => {
-                  const busy = busyTutor === tutor.user_id;
-                  const profile = tutor.tutor_profile;
+      {/* Search and account filters */}
+      <div className="mb-5 grid gap-3 md:grid-cols-[1fr_220px_auto]">
+        <Field label="Search tutors">
+          <input
+            value={tutorSearch}
+            onChange={(event) => {
+              setTutorSearch(event.target.value);
+              setTutorPage(1);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                void load(true);
+              }
+            }}
+            placeholder="Name, email or phone number"
+            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2] focus:ring-2 focus:ring-[#1769D2]/10"
+          />
+        </Field>
 
-                  return (
-                    <div
-                      key={tutor.user_id}
-                      className="rounded-xl border border-slate-200 p-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex min-w-0 items-start gap-3">
-                          {profile?.profile_picture_url ? (
-                            <img
-                              src={profile.profile_picture_url}
-                              alt={`${tutor.first_name} ${tutor.last_name}`}
-                              className="h-14 w-14 rounded-xl object-cover"
-                            />
-                          ) : (
-                            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#EDF4FF] text-lg font-bold text-[#1769D2]">
-                              {tutor.first_name.charAt(0)}
-                              {tutor.last_name.charAt(0)}
-                            </div>
-                          )}
+        <Field label="Account status">
+          <select
+            value={tutorStatusFilter}
+            onChange={(event) => {
+              setTutorStatusFilter(event.target.value);
+              setTutorPage(1);
+            }}
+            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
+          >
+            <option value="">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+            <option value="SUSPENDED">Suspended</option>
+            <option value="PENDING_VERIFICATION">
+              Pending verification
+            </option>
+          </select>
+        </Field>
 
-                          <div className="min-w-0">
-                            <p className="font-semibold text-[#102A56]">
-                              {tutor.first_name} {tutor.last_name}
-                            </p>
-                            <p className="mt-1 break-all text-sm text-slate-500">
-                              {tutor.email}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {tutor.phone_number || "No phone number"}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-400">
-                              Joined {formatDate(tutor.created_at)}
-                            </p>
-                          </div>
-                        </div>
+        <div className="flex items-end">
+          <Button
+            variant="outline"
+            disabled={loading || refreshing}
+            onClick={() => void load(true)}
+          >
+            Search
+          </Button>
+        </div>
+      </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className={statusClass(tutor.status)}>
-                            {tutor.status.replaceAll("_", " ")}
-                          </Badge>
-                          <Badge
-                            className={statusClass(
-                              tutor.verification_status || "NOT_SUBMITTED",
-                            )}
-                          >
-                            {(
-                              tutor.verification_status || "NOT SUBMITTED"
-                            ).replaceAll("_", " ")}
-                          </Badge>
-                        </div>
+      {/* Current pane description */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-[#102A56]">
+            {tutorPane === "incomplete_profiles"
+              ? "Profiles requiring completion"
+              : tutorPane === "incomplete_verification"
+                ? "Verification requirements outstanding"
+                : "Tutors ready for administrator review"}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {tutorTotal} matching tutor{tutorTotal === 1 ? "" : "s"}
+          </p>
+        </div>
+
+        {tutorPane === "pending_verification" && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              document
+                .getElementById("verification")
+                ?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            Open review queue
+          </Button>
+        )}
+      </div>
+
+      {loading ? (
+        <p className="py-5 text-sm text-slate-500">
+          Loading tutors...
+        </p>
+      ) : tutors.length ? (
+        <div className="space-y-4">
+          {tutors.map((tutor) => {
+            const busy = busyTutor === tutor.user_id;
+            const profile = tutor.tutor_profile;
+
+            return (
+              <div
+                key={tutor.user_id}
+                className="rounded-xl border border-slate-200 p-4"
+              >
+                {/* Tutor identity */}
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    {profile?.profile_picture_url ? (
+                      <img
+                        src={profile.profile_picture_url}
+                        alt={`${tutor.first_name} ${tutor.last_name}`}
+                        className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#EDF4FF] text-lg font-bold text-[#1769D2]">
+                        {tutor.first_name.charAt(0)}
+                        {tutor.last_name.charAt(0)}
                       </div>
+                    )}
 
-                      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                        <div>
-                          <p className="text-xs text-slate-400">Hourly rate</p>
-                          <p className="mt-1 font-medium text-slate-700">
-                            {formatRate(profile?.hourly_rate ?? null)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400">Experience</p>
-                          <p className="mt-1 font-medium text-slate-700">
-                            {profile
-                              ? `${profile.years_of_experience} years`
-                              : "Profile not created"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-400">
-                            Teaching modes
-                          </p>
-                          <p className="mt-1 font-medium text-slate-700">
-                            {formatList(profile?.tutoring_modes)}
-                          </p>
-                        </div>
-                      </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[#102A56]">
+                        {tutor.first_name} {tutor.last_name}
+                      </p>
 
-                      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={!profile?.id}
-                          onClick={() => viewTutorDetails(tutor)}
-                        >
-                          {profile?.id
-                            ? "View details"
-                            : "No profile available"}
-                        </Button>
+                      <p className="mt-1 break-all text-sm text-slate-500">
+                        {tutor.email}
+                      </p>
 
-                        {tutor.status !== "ACTIVE" && (
-                          <Button
-                            size="sm"
-                            disabled={busy}
-                            onClick={() =>
-                              void updateTutorStatus(tutor, "ACTIVE")
-                            }
-                          >
-                            {busy ? "Updating..." : "Activate"}
-                          </Button>
-                        )}
+                      <p className="mt-1 text-xs text-slate-500">
+                        {tutor.phone_number || "No phone number"}
+                      </p>
 
-                        {tutor.status === "ACTIVE" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() =>
-                              requestTutorStatusChange(tutor, "SUSPENDED")
-                            }
-                          >
-                            Suspend
-                          </Button>
-                        )}
-
-                        {tutor.status !== "INACTIVE" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() =>
-                              requestTutorStatusChange(tutor, "INACTIVE")
-                            }
-                          >
-                            Deactivate
-                          </Button>
-                        )}
-                      </div>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Joined {formatDate(tutor.created_at)}
+                      </p>
                     </div>
-                  );
-                })}
+                  </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                  <p className="text-xs text-slate-500">
-                    Page {tutorPage} of {tutorTotalPages} · {tutorTotal} tutors
-                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className={statusClass(tutor.status)}>
+                      {tutor.status.replaceAll("_", " ")}
+                    </Badge>
 
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={tutorPage <= 1 || loading}
-                      onClick={() => setTutorPage((page) => page - 1)}
+                    <Badge
+                      className={statusClass(
+                        tutor.verification_status || "NOT_SUBMITTED",
+                      )}
                     >
-                      Previous
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={tutorPage >= tutorTotalPages || loading}
-                      onClick={() => setTutorPage((page) => page + 1)}
-                    >
-                      Next
-                    </Button>
+                      {(tutor.verification_status || "NOT SUBMITTED")
+                        .replaceAll("_", " ")}
+                    </Badge>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <p className="py-5 text-sm text-slate-500">
-                No tutors found for the selected filters.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </section>
 
+                {/* Profile information */}
+                <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-slate-400">
+                      Hourly rate
+                    </p>
+                    <p className="mt-1 font-medium text-slate-700">
+                      {formatRate(profile?.hourly_rate ?? null)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400">
+                      Experience
+                    </p>
+                    <p className="mt-1 font-medium text-slate-700">
+                      {profile
+                        ? `${profile.years_of_experience} years`
+                        : "Profile not created"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400">
+                      Teaching modes
+                    </p>
+                    <p className="mt-1 font-medium text-slate-700">
+                      {formatList(profile?.tutoring_modes)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400">
+                      Teaching languages
+                    </p>
+                    <p className="mt-1 font-medium text-slate-700">
+                      {formatList(profile?.teaching_languages)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400">
+                      Learner age groups
+                    </p>
+                    <p className="mt-1 font-medium text-slate-700">
+                      {formatList(profile?.learner_age_groups)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-400">
+                      Qualifications
+                    </p>
+                    <p className="mt-1 line-clamp-2 font-medium text-slate-700">
+                      {profile?.qualifications || "Not provided"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Profile completion */}
+                {tutor.missing_profile_fields.length > 0 ? (
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-amber-800">
+                        Profile incomplete
+                      </p>
+                      <Badge className="border-amber-200 bg-white text-amber-700">
+                        {tutor.missing_profile_fields.length} outstanding
+                      </Badge>
+                    </div>
+
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-800">
+                      {tutor.missing_profile_fields.map((field) => (
+                        <li key={field}>
+                          {formatRequirement(field)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3">
+                    <p className="text-sm font-semibold text-green-800">
+                      Profile requirements complete
+                    </p>
+                  </div>
+                )}
+
+                {/* Verification completion */}
+                {tutor.profile_completed &&
+                  tutor.missing_verification_fields.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-700">
+                          Verification requirements outstanding
+                        </p>
+
+                        <Badge className="border-slate-200 bg-white text-slate-600">
+                          {tutor.missing_verification_fields.length} outstanding
+                        </Badge>
+                      </div>
+
+                      <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-slate-600">
+                        {tutor.missing_verification_fields.map((field) => (
+                          <li key={field}>
+                            {formatRequirement(field)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                {tutor.ready_for_verification && (
+                  <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                    <p className="text-sm font-semibold text-green-800">
+                      Ready for administrator review
+                    </p>
+
+                    <p className="mt-1 text-xs text-green-700">
+                      The tutor has completed the profile and verification
+                      submission requirements.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        document
+                          .getElementById("verification")
+                          ?.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="mt-2 text-sm font-semibold text-green-800 underline"
+                    >
+                      Go to verification review
+                    </button>
+                  </div>
+                )}
+
+                {/* Existing tutor actions */}
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!profile?.id}
+                    onClick={() => viewTutorDetails(tutor)}
+                  >
+                    {profile?.id
+                      ? "View details"
+                      : "No profile available"}
+                  </Button>
+
+                  {tutor.status !== "ACTIVE" && (
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      onClick={() =>
+                        void updateTutorStatus(tutor, "ACTIVE")
+                      }
+                    >
+                      {busy ? "Updating..." : "Activate"}
+                    </Button>
+                  )}
+
+                  {tutor.status === "ACTIVE" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        requestTutorStatusChange(tutor, "SUSPENDED")
+                      }
+                    >
+                      Suspend
+                    </Button>
+                  )}
+
+                  {tutor.status !== "INACTIVE" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        requestTutorStatusChange(tutor, "INACTIVE")
+                      }
+                    >
+                      Deactivate
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Pagination */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <p className="text-xs text-slate-500">
+              Page {tutorPage} of {tutorTotalPages} · {tutorTotal} tutors
+            </p>
+
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={tutorPage <= 1 || loading}
+                onClick={() => setTutorPage((page) => page - 1)}
+              >
+                Previous
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={tutorPage >= tutorTotalPages || loading}
+                onClick={() => setTutorPage((page) => page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
+          <p className="font-medium text-slate-700">
+            {tutorPane === "incomplete_profiles"
+              ? "No incomplete tutor profiles"
+              : tutorPane === "incomplete_verification"
+                ? "No outstanding verification requirements"
+                : "No tutors awaiting verification review"}
+          </p>
+
+          <p className="mt-1 text-sm text-slate-500">
+            There are no tutors matching this pane and the selected filters.
+          </p>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</section>
       {/* Verification queue */}
       <section id="verification" className="mt-6 scroll-mt-24">
         <Card>
