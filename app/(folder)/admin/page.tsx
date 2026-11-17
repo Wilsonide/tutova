@@ -33,6 +33,18 @@ type Verification = {
   review_notes: string | null;
 };
 
+type Referee = {
+  id: string;
+  full_name: string;
+  email: string;
+  job_title: string;
+  relationship_to_tutor: string;
+  status: "PENDING" | "CONSENTED" | "DECLINED" | "EXPIRED";
+  invitation_sent_at: string | null;
+  consented_at: string | null;
+  responded_at: string | null;
+};
+
 type PayoutStatus = "REQUESTED" | "PROCESSING" | "PAID" | "FAILED" | "REVERSED";
 
 type Payout = {
@@ -61,7 +73,7 @@ type AdminTutorProfile = {
   id: string;
   user_id: string;
   bio: string | null;
-  hourly_rate: number | null;
+  monthly_fee: number | null;
   qualifications: string | null;
   years_of_experience: number;
   teaching_languages: string[];
@@ -211,6 +223,8 @@ export default function AdminPage() {
   const router = useRouter();
 
   const [checks, setChecks] = useState<Verification[]>([]);
+  const [refereesByVerification, setRefereesByVerification] = useState<Record<string, Referee[]>>({});
+  const [loadingReferees, setLoadingReferees] = useState<string | null>(null);
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [tutors, setTutors] = useState<AdminTutor[]>([]);
   const [refunds, setRefunds] = useState<Refund[]>([]);
@@ -389,6 +403,18 @@ const [tutorPane, setTutorPane] =
       toast.error(error instanceof Error ? error.message : "Review failed");
     } finally {
       setBusyVerification(null);
+    }
+  }
+
+  async function loadReferees(verificationId: string) {
+    setLoadingReferees(verificationId);
+    try {
+      const result = await api<Referee[]>(`/verification/admin/${verificationId}/referees`);
+      setRefereesByVerification((current) => ({ ...current, [verificationId]: result }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load referee records");
+    } finally {
+      setLoadingReferees(null);
     }
   }
 
@@ -1009,10 +1035,10 @@ const [tutorPane, setTutorPane] =
                 <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
                   <div>
                     <p className="text-xs text-slate-400">
-                      Hourly rate
+                      Monthly tutoring fee
                     </p>
                     <p className="mt-1 font-medium text-slate-700">
-                      {formatRate(profile?.hourly_rate ?? null)}
+                      {formatRate(profile?.monthly_fee ?? null)}
                     </p>
                   </div>
 
@@ -1298,6 +1324,27 @@ const [tutorPane, setTutorPane] =
                           ? "Opening document..."
                           : "View identity document"}
                       </Button>
+                    </div>
+
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={loadingReferees === verification.id}
+                        onClick={() => void loadReferees(verification.id)}
+                      >
+                        {loadingReferees === verification.id ? "Loading referees…" : "View referee consent records"}
+                      </Button>
+                      {refereesByVerification[verification.id] && (
+                        <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+                          {refereesByVerification[verification.id].map((referee) => (
+                            <div key={referee.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                              <div><p className="font-medium text-slate-800">{referee.full_name}</p><p className="text-xs text-slate-500">{referee.email} · {referee.job_title} · {referee.relationship_to_tutor}</p>{referee.responded_at && <p className="mt-1 text-[11px] text-slate-400">Responded {new Date(referee.responded_at).toLocaleString()}</p>}</div>
+                              <Badge className={referee.status === "CONSENTED" ? "bg-emerald-50 text-emerald-700" : referee.status === "DECLINED" || referee.status === "EXPIRED" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}>{referee.status}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {verification.review_notes && (

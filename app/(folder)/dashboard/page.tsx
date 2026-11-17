@@ -19,13 +19,21 @@ import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { api } from "@/lib/api";
+import { api, money } from "@/lib/api";
 import type { Booking, TutoringRequest } from "@/lib/types";
 import { useAuth } from "@/components/providers";
 import { toast } from "sonner";
 
 type NotificationSummary = {
   unread_count?: number;
+};
+
+type TutorEarningsSummary = {
+  currency: string;
+  total_tutor_earnings_minor: number;
+  current_month_earnings_minor: number;
+  held_tutor_earnings_minor: number;
+  paid_out_minor: number;
 };
 
 type ChildLearner = {
@@ -85,6 +93,7 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [children, setChildren] = useState<ChildLearner[]>([]);
   const [unread, setUnread] = useState(0);
+  const [earnings, setEarnings] = useState<TutorEarningsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [childrenLoading, setChildrenLoading] = useState(false);
 
@@ -148,6 +157,15 @@ export default function DashboardPage() {
 
       if (results[2].status === "fulfilled") {
         setUnread(results[2].value.unread_count || 0);
+      }
+
+      if (isTutor) {
+        try {
+          const earningsSummary = await api<TutorEarningsSummary>("/payments/earnings/summary");
+          if (active) setEarnings(earningsSummary);
+        } catch {
+          if (active) toast.error("Tutor earnings summary could not be loaded.");
+        }
       }
 
       if (results.every((result) => result.status === "rejected")) {
@@ -385,7 +403,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={`grid gap-4 sm:grid-cols-2 ${isTutor ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
             <Card className="border-slate-200/80 shadow-sm">
               <CardContent className="flex items-center justify-between p-5">
                 <div>
@@ -423,6 +441,26 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {isTutor && (
+              <Card className="border-slate-200/80 shadow-sm">
+                <CardContent className="flex items-center justify-between p-5">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">This month's earnings</p>
+                    <p className="mt-2 text-2xl font-bold tracking-tight text-[#00A99A]">
+                      {loading ? "—" : money(earnings?.current_month_earnings_minor ?? 0, earnings?.currency ?? "NGN")}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {money(earnings?.held_tutor_earnings_minor ?? 0, earnings?.currency ?? "NGN")} held by Tutova
+                    </p>
+                    <Link href="/earnings" className="mt-2 inline-block text-xs font-semibold text-[#1769D2]">View earnings and payouts</Link>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                    <Wallet className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="border-slate-200/80 shadow-sm sm:col-span-2 xl:col-span-1">
               <CardContent className="flex items-center justify-between p-5">

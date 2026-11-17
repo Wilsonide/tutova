@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+
 import {
   CalendarDays,
   ChartNoAxesColumn,
-  Compass,
   LayoutDashboard,
   LogOut,
   ShieldCheck,
@@ -24,6 +24,7 @@ import {
 
 import { Brand } from "@/components/brand";
 import { useAuth } from "@/components/providers";
+import { getMyTutorVerification } from "@/lib/api";
 import { toast } from "sonner";
 
 const learnerNav = [
@@ -99,27 +100,108 @@ export function AppShell({
   description?: string;
 }) {
   const { user, loading, signOut } = useAuth();
+
   const router = useRouter();
   const path = usePathname();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(
+    null,
+  );
+
+  const [verificationChecked, setVerificationChecked] = useState(false);
+
+  const isTutor = user?.role === "TUTOR";
+  const isTutorOnboarding = path.startsWith("/tutor/onboarding");
+  const isApprovedTutor = isTutor && verificationStatus === "APPROVED";
+
+  // Authentication protection.
   useEffect(() => {
     if (!loading && !user) {
       router.replace(`/login?next=${encodeURIComponent(path)}`);
     }
   }, [loading, user, router, path]);
 
+  // Close mobile navigation whenever the route changes.
   useEffect(() => {
     setMobileOpen(false);
   }, [path]);
 
+  // Check tutor verification status.
+  useEffect(() => {
+    let cancelled = false;
+
+    if (loading || !user) {
+      setVerificationChecked(false);
+      setVerificationStatus(null);
+      return;
+    }
+
+    if (user.role !== "TUTOR") {
+      setVerificationStatus(null);
+      setVerificationChecked(true);
+      return;
+    }
+
+    setVerificationChecked(false);
+    setVerificationStatus(null);
+
+    async function checkTutorVerification() {
+      try {
+        const verification = await getMyTutorVerification();
+
+        if (!cancelled) {
+          setVerificationStatus(verification.status);
+        }
+      } catch (error) {
+        console.error("Unable to retrieve tutor verification status:", error);
+
+        if (!cancelled) {
+          setVerificationStatus(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setVerificationChecked(true);
+        }
+      }
+    }
+
+    checkTutorVerification();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role, loading]);
+
+  // Redirect tutors who have not been approved.
+  useEffect(() => {
+    if (
+      !loading &&
+      user?.role === "TUTOR" &&
+      verificationChecked &&
+      verificationStatus !== "APPROVED" &&
+      !isTutorOnboarding
+    ) {
+      router.replace("/tutor/onboarding");
+    }
+  }, [
+    loading,
+    user?.role,
+    verificationChecked,
+    verificationStatus,
+    isTutorOnboarding,
+    router,
+  ]);
+
+  // Authentication loading state.
   if (loading || !user) {
     return (
       <div className="grid min-h-screen place-items-center bg-[#F7F9FC]">
         <div className="flex flex-col items-center gap-3">
           <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-[#1769D2]/20 border-t-[#1769D2]" />
+
           <p className="text-xs font-medium text-[#8290A4]">
             Preparing your workspace...
           </p>
@@ -128,6 +210,61 @@ export function AppShell({
     );
   }
 
+  // Wait until tutor verification has been checked.
+  if (isTutor && !verificationChecked) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#F7F9FC]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-[#1769D2]/20 border-t-[#1769D2]" />
+
+          <p className="text-xs font-medium text-[#8290A4]">
+            Checking your tutor verification...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Unverified tutors get the onboarding page only.
+  // No dashboard sidebar or application navigation is displayed.
+  if (isTutor && !isApprovedTutor) {
+    if (!isTutorOnboarding) {
+      return (
+        <div className="grid min-h-screen place-items-center bg-[#F7F9FC]">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-[#1769D2]/20 border-t-[#1769D2]" />
+
+            <p className="text-xs font-medium text-[#8290A4]">
+              Redirecting to tutor onboarding...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-[#F7F9FC]">
+        {/* Dedicated onboarding content layout */}
+        <main className="mx-auto w-full max-w-[1440px] px-4 pb-12 pt-10 sm:px-7 sm:pt-12 lg:px-10 lg:pt-14">
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="mb-8">
+              <h1 className="page-heading">{title}</h1>
+
+              {description && (
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[#758298]">
+                  {description}
+                </p>
+              )}
+            </div>
+
+            {children}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Normal application workspace.
   const isAdmin = user.role === "ADMIN" || user.role === "SUPER_ADMIN";
 
   const items = isAdmin
@@ -142,6 +279,7 @@ export function AppShell({
 
   const showSafetyLink = !isAdmin;
 
+  // Sign out.
   const handleSignOut = async () => {
     if (signingOut) return;
 
@@ -149,15 +287,19 @@ export function AppShell({
 
     try {
       await signOut();
+
       setMobileOpen(false);
+
       router.replace("/");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not log out");
+
       setSigningOut(false);
     }
   };
 
+  // Navigation styling.
   const navLinkClass = (href: string) => {
     const active = isActivePath(path, href);
 
@@ -170,6 +312,7 @@ export function AppShell({
     ].join(" ");
   };
 
+  // Main navigation.
   const renderNavigation = () => (
     <nav className="space-y-1" aria-label="Main navigation">
       {items.map((item) => {
@@ -203,6 +346,7 @@ export function AppShell({
     </nav>
   );
 
+  // Account navigation.
   const renderAccountNavigation = () => (
     <nav className="space-y-1" aria-label="Account navigation">
       <Link
@@ -231,6 +375,7 @@ export function AppShell({
     </nav>
   );
 
+  // User identity.
   const renderUserIdentity = () => (
     <div className="flex min-w-0 items-center gap-3">
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#E9F2FF] text-sm font-bold text-[#1769D2] ring-4 ring-[#F7F9FC]">
@@ -241,6 +386,7 @@ export function AppShell({
         <p className="truncate text-[13px] font-bold text-[#102A56]">
           {fullName || "Tutova user"}
         </p>
+
         <p className="mt-0.5 truncate text-[11px] font-medium text-[#8A96A8]">
           {roleLabel}
         </p>
@@ -252,12 +398,10 @@ export function AppShell({
     <div className="min-h-screen bg-[#F7F9FC]">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[250px] flex-col border-r border-[#E7EBF2] bg-white lg:flex">
-        {/* Brand */}
         <div className="flex h-[76px] shrink-0 items-center border-b border-[#EDF0F5] px-6">
           <Brand />
         </div>
 
-        {/* Sidebar navigation */}
         <div className="flex-1 overflow-y-auto px-4 py-7">
           {renderNavigation()}
 
@@ -270,7 +414,6 @@ export function AppShell({
           {renderAccountNavigation()}
         </div>
 
-        {/* User account footer */}
         <div className="shrink-0 border-t border-[#EDF0F5] p-4">
           <div className="rounded-2xl bg-[#F7F9FC] p-3">
             {renderUserIdentity()}
@@ -308,7 +451,6 @@ export function AppShell({
             </div>
           </div>
 
-          {/* Mobile navigation */}
           {mobileOpen && (
             <div className="border-t border-[#EDF0F5] bg-white px-4 pb-5 pt-4 shadow-lg">
               <div className="mb-5 rounded-2xl border border-[#E8EDF3] bg-[#F8FAFC] p-3">

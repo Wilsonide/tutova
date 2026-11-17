@@ -46,7 +46,7 @@ type MatchingTutor = {
   first_name: string;
   last_name: string;
   bio: string | null;
-  hourly_rate: number | string | null;
+  monthly_fee: number | string | null;
   qualifications: string | null;
   years_of_experience: number;
   teaching_languages: string[];
@@ -69,7 +69,7 @@ type PublicTutor = {
   bio: string | null;
   qualifications: string | null;
   years_of_experience: number;
-  hourly_rate: number | string | null;
+  monthly_fee: number | string | null;
   teaching_languages: string[];
   learner_age_groups: string[];
   tutoring_modes: string[];
@@ -107,8 +107,9 @@ type LessonBooking = {
   start_at: string;
   end_at: string;
   duration_minutes: number;
-  hourly_rate: number | string;
+  monthly_fee: number | string;
   gross_amount_minor: number;
+  monthly_arrangement_id?: string | null;
   currency: string;
   status: BookingStatus;
   meeting_link: string | null;
@@ -201,7 +202,7 @@ function formatRate(rate: number | string | null) {
     return "Rate not specified";
   }
 
-  return `₦${numericRate.toLocaleString("en-NG")}/hour`;
+  return `₦${numericRate.toLocaleString("en-NG")}/month`;
 }
 
 function formatBookingAmount(booking: LessonBooking) {
@@ -479,6 +480,8 @@ export default function RequestsPage() {
   const [bookingRequest, setBookingRequest] = useState("");
   const [startAt, setStartAt] = useState("");
   const [duration, setDuration] = useState("60");
+  const [contractMonths, setContractMonths] = useState("1");
+  const [monthlyArrangementId, setMonthlyArrangementId] = useState<string | null>(null);
   const [lessonNotes, setLessonNotes] = useState("");
 
   // Booking actions.
@@ -1033,23 +1036,29 @@ export default function RequestsPage() {
     setBusy(true);
 
     try {
-      await api(
+      const createdBooking = await api<{ monthly_arrangement_id?: string }>(
         `/session-bookings/requests/${encodeURIComponent(bookingRequest)}`,
         {
           method: "POST",
           body: JSON.stringify({
             start_at: proposedStart.toISOString(),
             duration_minutes: Number(duration),
+            contract_months: Number(contractMonths),
+            monthly_arrangement_id: monthlyArrangementId,
             lesson_notes: lessonNotes.trim() || null,
           }),
         },
       );
+      if (createdBooking.monthly_arrangement_id) {
+        setMonthlyArrangementId(createdBooking.monthly_arrangement_id);
+      }
 
       toast.success("Your lesson booking request has been sent to the tutor.");
 
       setBookingRequest("");
       setStartAt("");
       setDuration("60");
+      setContractMonths("1");
       setLessonNotes("");
 
       await load();
@@ -1612,7 +1621,7 @@ export default function RequestsPage() {
                     </h2>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      {formatRate(selectedTutor.hourly_rate)}
+                      {formatRate(selectedTutor.monthly_fee)}
                       {" · "}
                       {selectedTutor.years_of_experience}{" "}
                       {selectedTutor.years_of_experience === 1
@@ -2081,6 +2090,27 @@ export default function RequestsPage() {
                 />
               </Field>
 
+              {monthlyArrangementId ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                  This lesson will be added to your existing tutoring contract. You will not be charged for the contract again.
+                </div>
+              ) : (
+                <Field label="Tutoring contract duration">
+                  <select
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    value={contractMonths}
+                    onChange={(event) => setContractMonths(event.target.value)}
+                  >
+                    <option value="1">1 month</option>
+                    <option value="2">2 months</option>
+                    <option value="3">3 months</option>
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    The full agreed contract amount is paid to Tutova upfront.
+                  </p>
+                </Field>
+              )}
+
               <Field label="Lesson duration">
                 <select
                   className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
@@ -2119,6 +2149,7 @@ export default function RequestsPage() {
                     setBookingRequest("");
                     setStartAt("");
                     setDuration("60");
+                    setContractMonths("1");
                     setLessonNotes("");
                   }}
                 >
@@ -2265,9 +2296,14 @@ export default function RequestsPage() {
                           type="button"
                           className="mt-3"
                           onClick={() => {
+                            const existingArrangement = requestBookings.find(
+                              (item) => Boolean(item.monthly_arrangement_id),
+                            )?.monthly_arrangement_id ?? null;
+                            setMonthlyArrangementId(existingArrangement);
                             setBookingRequest(request.id);
                             setStartAt("");
                             setDuration("60");
+                            setContractMonths("1");
                             setLessonNotes("");
                           }}
                         >
@@ -2409,7 +2445,7 @@ export default function RequestsPage() {
                                       {tutor.first_name} {tutor.last_name}
                                     </h4>
                                     <p className="mt-1 text-sm font-medium text-slate-700">
-                                      {formatRate(tutor.hourly_rate)}
+                                      {formatRate(tutor.monthly_fee)}
                                     </p>
                                   </div>
 

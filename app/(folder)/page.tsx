@@ -39,7 +39,7 @@ interface PublicTutor {
   bio: string | null;
   qualifications: string | null;
   years_of_experience: number;
-  hourly_rate: number | string | null;
+  monthly_fee: number | string | null;
   teaching_languages: string[];
   learner_age_groups: string[];
   tutoring_modes: ("ONLINE" | "IN_PERSON" | "HYBRID")[];
@@ -242,9 +242,11 @@ function FeaturedTutorCard({ tutor }: { tutor: PublicTutor }) {
 
         <div className="mt-5 flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-medium text-white/60">Hourly rate</p>
+            <p className="text-xs font-medium text-white/60">
+              Monthly tutoring fee
+            </p>
             <p className="mt-1 text-xl font-bold text-white">
-              {formatRate(tutor.hourly_rate)}
+              {formatRate(tutor.monthly_fee)}
             </p>
           </div>
 
@@ -489,18 +491,20 @@ export default function HomePage() {
 
             {/* HERO IMAGE COMPOSITION */}
             <div className="relative mx-auto w-full max-w-[570px]">
+              {/* Decorative elements */}
               <div className="absolute -left-4 top-14 h-32 w-32 rounded-full border border-[#BBDCF5] sm:-left-8" />
               <div className="absolute -bottom-5 right-8 h-28 w-28 rounded-full bg-[#CFF2EB]" />
 
               <div className="relative grid grid-cols-[1fr_0.78fr] items-center gap-3 sm:gap-5">
+                {/* Main image — tutor guiding a learner */}
                 <div className="relative overflow-hidden rounded-[28px] rounded-br-[90px] bg-[#DCEBFA] shadow-xl">
                   <img
-                    src="https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=1000&auto=format&fit=crop&q=90"
-                    alt="Tutor working with learning materials"
+                    src="/images/hero-image.jpeg"
+                    alt="Black female tutor helping a young learner with schoolwork"
                     className="h-[340px] w-full object-cover object-center sm:h-[440px]"
                   />
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#102A56]/35 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#102A56]/45 via-transparent to-transparent" />
 
                   <div className="absolute bottom-5 left-5 right-5 text-white">
                     <p className="text-xs font-medium text-white/80">
@@ -512,37 +516,25 @@ export default function HomePage() {
                   </div>
                 </div>
 
+                {/* Supporting images */}
                 <div className="flex flex-col gap-4">
+                  {/* Tutor and learner interaction */}
                   <div className="overflow-hidden rounded-[26px] rounded-bl-[70px] bg-[#E1F4F0] shadow-lg">
                     <img
-                      src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=800&auto=format&fit=crop&q=85"
-                      alt="Learner portrait"
+                      src="https://images.pexels.com/photos/5905490/pexels-photo-5905490.jpeg?auto=compress&cs=tinysrgb&w=800"
+                      alt="Black female teacher encouraging a young learner"
                       className="h-[190px] w-full object-cover object-center sm:h-[245px]"
                     />
                   </div>
 
+                  {/* Independent learner */}
                   <div className="overflow-hidden rounded-[26px] rounded-tr-[65px] bg-[#E8E9F9] shadow-lg">
                     <img
-                      src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800&auto=format&fit=crop&q=85"
-                      alt="Learner portrait"
+                      src="https://images.pexels.com/photos/5905863/pexels-photo-5905863.jpeg?auto=compress&cs=tinysrgb&w=800"
+                      alt="Black student concentrating on schoolwork"
                       className="h-[145px] w-full object-cover object-center sm:h-[180px]"
                     />
                   </div>
-                </div>
-              </div>
-
-              <div className="absolute -bottom-7 left-2 flex items-center gap-3 rounded-2xl border border-white/80 bg-white p-4 shadow-[0_12px_35px_rgba(16,42,86,0.13)] sm:-left-8">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#E2F7F2] text-[#009688]">
-                  <GraduationCap className="h-6 w-6" />
-                </div>
-
-                <div>
-                  <p className="text-sm font-bold text-[#102A56]">
-                    Your learning journey
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Starts with one good connection
-                  </p>
                 </div>
               </div>
             </div>

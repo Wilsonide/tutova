@@ -22,7 +22,7 @@ export type TutorProfile = {
   id: string;
   user_id: string;
   bio: string | null;
-  hourly_rate: number | null;
+  monthly_fee: number | null;
   qualifications: string | null;
   years_of_experience: number;
   teaching_languages: string[];
@@ -80,8 +80,9 @@ export type Booking = {
   start_at: string;
   end_at: string;
   duration_minutes: number;
-  hourly_rate: number | null;
+  monthly_fee: number | null;
   gross_amount_minor: number | null;
+  monthly_arrangement_id?: string | null;
   currency: string;
   status: string;
   meeting_link: string | null;

@@ -133,3 +133,17 @@ export function money(amountMinor: number, currency = "NGN") {
     maximumFractionDigits: 2,
   }).format(amountMinor / 100);
 }
+
+export type TutorVerificationStatus = {
+  id: string;
+  status: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "CHANGES_REQUESTED";
+  nda_version: string | null;
+  nda_accepted_at: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+};
+
+export async function getMyTutorVerification(): Promise<TutorVerificationStatus> {
+  return api<TutorVerificationStatus>("/verification/tutor/me");
+}

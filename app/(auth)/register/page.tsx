@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
@@ -13,7 +14,6 @@ import {
   Users,
 } from "lucide-react";
 
-import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -174,7 +174,24 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-6">
-        <Brand />
+        <Link
+          href="/"
+          aria-label="Tutova home"
+          className="inline-flex items-center gap-3 transition-opacity hover:opacity-80"
+        >
+          <Image
+            src="/images/logo.png"
+            alt="Tutova logo"
+            width={180}
+            height={60}
+            priority
+            className="h-12 w-auto object-contain"
+          />
+
+          <span className="text-2xl font-extrabold tracking-tight text-[#102A56]">
+            Tutova<span className="text-[#00AFA0]">.</span>
+          </span>
+        </Link>
 
         <Link
           href="/"

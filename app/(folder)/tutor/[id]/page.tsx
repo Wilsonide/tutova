@@ -43,7 +43,7 @@ interface PublicTutor {
   bio: string | null;
   qualifications: string | null;
   years_of_experience: number;
-  hourly_rate: number | null;
+  monthly_fee: number | null;
   teaching_languages: string[];
   learner_age_groups: string[];
   tutoring_modes: string[];
@@ -503,15 +503,15 @@ export default function TutorDetailsPage() {
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 p-6">
                 <p className="text-sm font-medium text-slate-500">
-                  Tutor's hourly rate
+                  Tutor's monthly tutoring fee
                 </p>
 
                 <div className="mt-2 flex flex-wrap items-baseline gap-2">
                   <span className="text-3xl font-extrabold tracking-tight text-[#102A56]">
-                    {formatCurrency(tutor.hourly_rate)}
+                    {formatCurrency(tutor.monthly_fee)}
                   </span>
 
-                  {tutor.hourly_rate !== null && (
+                  {tutor.monthly_fee !== null && (
                     <span className="text-sm text-slate-400">/ hour</span>
                   )}
                 </div>

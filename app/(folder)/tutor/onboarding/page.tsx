@@ -54,7 +54,7 @@ type TutorProfile = {
   id?: string;
   bio: string | null;
   qualifications: string | null;
-  hourly_rate: number | string | null;
+  monthly_fee: number | string | null;
   years_of_experience: number;
   teaching_languages: string[];
   learner_age_groups: string[];
@@ -87,6 +87,30 @@ type VerificationResponse = {
   submitted_at?: string | null;
   reviewed_at?: string | null;
   review_notes?: string | null;
+};
+
+type RefereeStatus = "PENDING" | "CONSENTED" | "DECLINED" | "EXPIRED";
+type TutorReferee = {
+  id: string;
+  full_name: string;
+  email: string;
+  job_title: string;
+  relationship_to_tutor: string;
+  status: RefereeStatus;
+  invitation_sent_at: string | null;
+  consented_at: string | null;
+};
+type RefereeDraft = {
+  full_name: string;
+  email: string;
+  job_title: string;
+  relationship_to_tutor: string;
+};
+const EMPTY_REFEREE: RefereeDraft = {
+  full_name: "",
+  email: "",
+  job_title: "",
+  relationship_to_tutor: "",
 };
 
 type UploadResponse = {
@@ -213,18 +237,20 @@ function StepIndicator({
   currentStep,
   onStepChange,
   profileExists,
+  stage2Completed,
 }: {
-  currentStep: 1 | 2;
-  onStepChange: (step: 1 | 2) => void;
+  currentStep: 1 | 2 | 3;
+  onStepChange: (step: 1 | 2 | 3) => void;
   profileExists: boolean;
+  stage2Completed: boolean;
 }) {
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-      <div className="grid grid-cols-2 gap-3">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <button
           type="button"
           onClick={() => onStepChange(1)}
-          className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
+          className={`flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1769D2] focus-visible:ring-offset-2 ${
             currentStep === 1
               ? "border-[#1769D2] bg-blue-50"
               : "border-transparent bg-slate-50 hover:bg-slate-100"
@@ -256,7 +282,7 @@ function StepIndicator({
           type="button"
           disabled={!profileExists}
           onClick={() => onStepChange(2)}
-          className={`flex items-center gap-3 rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1769D2] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
             currentStep === 2
               ? "border-[#1769D2] bg-blue-50"
               : "border-transparent bg-slate-50 hover:bg-slate-100"
@@ -264,12 +290,14 @@ function StepIndicator({
         >
           <span
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-              currentStep === 2
-                ? "bg-[#1769D2] text-white"
-                : "bg-slate-200 text-slate-600"
+              stage2Completed
+                ? "bg-emerald-100 text-emerald-700"
+                : currentStep === 2
+                  ? "bg-[#1769D2] text-white"
+                  : "bg-slate-200 text-slate-600"
             }`}
           >
-            2
+            {stage2Completed ? <Check size={17} /> : "2"}
           </span>
 
           <span className="min-w-0">
@@ -281,12 +309,36 @@ function StepIndicator({
             </span>
           </span>
         </button>
+        <button
+          type="button"
+          disabled={!stage2Completed}
+          onClick={() => onStepChange(3)}
+          className={`flex min-w-0 items-center gap-3 rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1769D2] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+            currentStep === 3
+              ? "border-[#1769D2] bg-blue-50"
+              : "border-transparent bg-slate-50 hover:bg-slate-100"
+          }`}
+        >
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${currentStep === 3 ? "bg-[#1769D2] text-white" : "bg-slate-200 text-slate-600"}`}
+          >
+            3
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-[#102A56]">
+              Referees
+            </span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              At least two referee checks
+            </span>
+          </span>
+        </button>
       </div>
 
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
         <div
           className={`h-full rounded-full bg-[#00A99A] transition-all ${
-            currentStep === 1 ? "w-1/2" : "w-full"
+            currentStep === 1 ? "w-1/3" : currentStep === 2 ? "w-2/3" : "w-full"
           }`}
         />
       </div>
@@ -444,7 +496,8 @@ function LocationSelect({
 /* -------------------------------------------------------------------------- */
 
 export default function TutorOnboardingPage() {
-  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [stage2Completed, setStage2Completed] = useState(false);
 
   /* Profile fields */
   const [bio, setBio] = useState("");
@@ -512,6 +565,11 @@ export default function TutorOnboardingPage() {
   const [verification, setVerification] = useState<VerificationResponse | null>(
     null,
   );
+  const [referees, setReferees] = useState<TutorReferee[]>([]);
+  const [refereeDrafts, setRefereeDrafts] = useState<RefereeDraft[]>([
+    { ...EMPTY_REFEREE },
+    { ...EMPTY_REFEREE },
+  ]);
 
   const pictureInputRef = useRef<HTMLInputElement>(null);
 
@@ -550,6 +608,13 @@ export default function TutorOnboardingPage() {
       })),
     [locationIds, locationNames],
   );
+
+  const invitationsDispatched =
+    referees.filter((referee) => Boolean(referee.invitation_sent_at)).length >=
+    2;
+  const consentedRefereeCount = referees.filter(
+    (referee) => referee.status === "CONSENTED",
+  ).length;
 
   const verificationStatus = verification?.status ?? "NOT_SUBMITTED";
 
@@ -920,6 +985,7 @@ export default function TutorOnboardingPage() {
         api<Subject[]>("/subjects", {}, { auth: false }),
         api<TutorProfile>("/tutors/profile"),
         api<VerificationResponse>("/verification/tutor/me"),
+        api<TutorReferee[]>("/verification/tutor/referees"),
         fetchLocations({ location_type: "STATE" }),
         api<CurrentUserResponse>("/auth/me"),
       ]);
@@ -930,6 +996,7 @@ export default function TutorOnboardingPage() {
         subjectResult,
         profileResult,
         verificationResult,
+        refereeResult,
         statesResult,
         currentUserResult,
       ] = results;
@@ -954,7 +1021,7 @@ export default function TutorOnboardingPage() {
         setBio(profile.bio ?? "");
         setQualifications(profile.qualifications ?? "");
         setRate(
-          profile.hourly_rate !== null ? String(profile.hourly_rate) : "",
+          profile.monthly_fee !== null ? String(profile.monthly_fee) : "",
         );
         setYears(String(profile.years_of_experience ?? 0));
         setLanguages((profile.teaching_languages ?? []).join(", "));
@@ -976,6 +1043,30 @@ export default function TutorOnboardingPage() {
 
       if (verificationResult.status === "fulfilled") {
         setVerification(verificationResult.value);
+        if (
+          [
+            "PENDING_REVIEW",
+            "APPROVED",
+            "REJECTED",
+            "CHANGES_REQUESTED",
+          ].includes(verificationResult.value.status)
+        ) {
+          setStage2Completed(true);
+        }
+      }
+
+      if (refereeResult.status === "fulfilled") {
+        setReferees(refereeResult.value);
+        if (refereeResult.value.length) {
+          setRefereeDrafts(
+            refereeResult.value.map((item) => ({
+              full_name: item.full_name,
+              email: item.email,
+              job_title: item.job_title,
+              relationship_to_tutor: item.relationship_to_tutor,
+            })),
+          );
+        }
       }
 
       if (currentUserResult.status === "fulfilled") {
@@ -1150,115 +1241,104 @@ export default function TutorOnboardingPage() {
   /* Introduction video                                                       */
   /* ------------------------------------------------------------------------ */
 
-  async function handleIntroductionVideo(
-  event: ChangeEvent<HTMLInputElement>,
-) {
-  const file = event.target.files?.[0];
-  event.target.value = "";
+  async function handleIntroductionVideo(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
 
-  if (!file) return;
+    if (!file) return;
 
-  if (!exists) {
-    toast.error("Create your tutor profile before uploading a video.");
-    return;
-  }
+    if (!exists) {
+      toast.error("Create your tutor profile before uploading a video.");
+      return;
+    }
 
-  if (
-    !validateFile(
-      file,
-      ["video/mp4", "video/webm"],
-      100 * 1024 * 1024,
-      "introduction video",
-    )
-  ) {
-    return;
-  }
+    if (
+      !validateFile(
+        file,
+        ["video/mp4", "video/webm"],
+        100 * 1024 * 1024,
+        "introduction video",
+      )
+    ) {
+      return;
+    }
 
-  setUploading("video");
+    setUploading("video");
 
-  try {
-    // Step 1: Ask FastAPI for a signed, tutor-specific Cloudinary upload.
-    const authorization =
-      await api<VideoUploadSignatureResponse>(
+    try {
+      // Step 1: Ask FastAPI for a signed, tutor-specific Cloudinary upload.
+      const authorization = await api<VideoUploadSignatureResponse>(
         "/tutors/profile/introduction-video/signature",
         {
           method: "POST",
         },
       );
 
-    // Step 2: Upload the actual video directly to Cloudinary.
-    // The video does not pass through Vercel or FastAPI.
-    const cloudinaryForm = new FormData();
+      // Step 2: Upload the actual video directly to Cloudinary.
+      // The video does not pass through Vercel or FastAPI.
+      const cloudinaryForm = new FormData();
 
-    cloudinaryForm.append("file", file);
-    cloudinaryForm.append("api_key", authorization.api_key);
-    cloudinaryForm.append(
-      "timestamp",
-      String(authorization.timestamp),
-    );
-    cloudinaryForm.append("public_id", authorization.public_id);
-    cloudinaryForm.append("signature", authorization.signature);
+      cloudinaryForm.append("file", file);
+      cloudinaryForm.append("api_key", authorization.api_key);
+      cloudinaryForm.append("timestamp", String(authorization.timestamp));
+      cloudinaryForm.append("public_id", authorization.public_id);
+      cloudinaryForm.append("signature", authorization.signature);
 
-    const cloudinaryResponse = await fetch(
-      `https://api.cloudinary.com/v1_1/${encodeURIComponent(
-        authorization.cloud_name,
-      )}/video/upload`,
-      {
-        method: "POST",
-        body: cloudinaryForm,
-      },
-    );
-
-    const cloudinaryResult =
-      (await cloudinaryResponse.json()) as CloudinaryVideoUploadResponse;
-
-    if (!cloudinaryResponse.ok) {
-      throw new Error(
-        cloudinaryResult.error?.message ??
-          "Cloudinary could not upload your introduction video.",
+      const cloudinaryResponse = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(
+          authorization.cloud_name,
+        )}/video/upload`,
+        {
+          method: "POST",
+          body: cloudinaryForm,
+        },
       );
-    }
 
-    if (
-      !cloudinaryResult.public_id ||
-      cloudinaryResult.public_id !== authorization.public_id
-    ) {
-      throw new Error(
-        "The uploaded video could not be verified.",
+      const cloudinaryResult =
+        (await cloudinaryResponse.json()) as CloudinaryVideoUploadResponse;
+
+      if (!cloudinaryResponse.ok) {
+        throw new Error(
+          cloudinaryResult.error?.message ??
+            "Cloudinary could not upload your introduction video.",
+        );
+      }
+
+      if (
+        !cloudinaryResult.public_id ||
+        cloudinaryResult.public_id !== authorization.public_id
+      ) {
+        throw new Error("The uploaded video could not be verified.");
+      }
+
+      // Step 3: Ask FastAPI to verify the Cloudinary asset and save it.
+      // Never save the browser-provided secure_url directly.
+      const response = await api<UploadResponse>(
+        "/tutors/profile/introduction-video/complete",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            public_id: cloudinaryResult.public_id,
+          }),
+        },
       );
+
+      if (response.introduction_video_url) {
+        setVideoUrl(response.introduction_video_url);
+      } else {
+        const profile = await api<TutorProfile>("/tutors/profile");
+        setVideoUrl(profile.introduction_video_url ?? null);
+      }
+
+      toast.success("Introduction video uploaded successfully.");
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error, "Could not upload your introduction video."),
+      );
+    } finally {
+      setUploading(null);
     }
-
-    // Step 3: Ask FastAPI to verify the Cloudinary asset and save it.
-    // Never save the browser-provided secure_url directly.
-    const response = await api<UploadResponse>(
-      "/tutors/profile/introduction-video/complete",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          public_id: cloudinaryResult.public_id,
-        }),
-      },
-    );
-
-    if (response.introduction_video_url) {
-      setVideoUrl(response.introduction_video_url);
-    } else {
-      const profile = await api<TutorProfile>("/tutors/profile");
-      setVideoUrl(profile.introduction_video_url ?? null);
-    }
-
-    toast.success("Introduction video uploaded successfully.");
-  } catch (error) {
-    toast.error(
-      getErrorMessage(
-        error,
-        "Could not upload your introduction video.",
-      ),
-    );
-  } finally {
-    setUploading(null);
   }
-}
 
   async function removeIntroductionVideo() {
     if (!exists) return;
@@ -1353,12 +1433,12 @@ export default function TutorOnboardingPage() {
     }
 
     if (!rate || !Number.isFinite(Number(rate)) || Number(rate) <= 0) {
-      toast.error("Enter a valid hourly rate.");
+      toast.error("Enter a valid monthly tutoring fee.");
       return;
     }
 
     if (Number(rate) > 10000000) {
-      toast.error("Hourly rate cannot exceed ₦10,000,000.");
+      toast.error("Monthly tutoring fee cannot exceed ₦10,000,000.");
       return;
     }
 
@@ -1406,7 +1486,7 @@ export default function TutorOnboardingPage() {
         body: JSON.stringify({
           bio: bio.trim() || null,
           qualifications: qualifications.trim() || null,
-          hourly_rate: Number(rate),
+          monthly_fee: Number(rate),
           years_of_experience: experience,
           teaching_languages: languageList,
           learner_age_groups: ages,
@@ -1463,8 +1543,8 @@ export default function TutorOnboardingPage() {
   /* Step 2: Submit verification                                              */
   /* ------------------------------------------------------------------------ */
 
-  async function submitVerification(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitVerification(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
 
     if (!exists) {
       toast.error("Create your tutor profile in Step 1 first.");
@@ -1474,6 +1554,14 @@ export default function TutorOnboardingPage() {
 
     if (!acceptNda) {
       toast.error("You must accept the tutor NDA before submitting.");
+      return;
+    }
+
+    if (!invitationsDispatched) {
+      toast.error(
+        "Send referee invitations to at least two referees before submitting verification.",
+      );
+      setCurrentStep(3);
       return;
     }
 
@@ -1492,11 +1580,76 @@ export default function TutorOnboardingPage() {
       );
 
       setVerification(response);
+      setStage2Completed(true);
       setAcceptNda(false);
       toast.success("Your verification has been submitted for review.");
     } catch (error) {
       toast.error(
         getErrorMessage(error, "Could not submit your verification."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function inviteReferees(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (
+      refereeDrafts.length < 2 ||
+      refereeDrafts.some(
+        (item) =>
+          !item.full_name.trim() ||
+          !item.email.trim() ||
+          !item.job_title.trim() ||
+          !item.relationship_to_tutor.trim(),
+      )
+    ) {
+      toast.error(
+        "Enter the full name, email, job title and relationship for at least two referees.",
+      );
+      return;
+    }
+    const emails = refereeDrafts.map((item) => item.email.trim().toLowerCase());
+    if (new Set(emails).size !== emails.length) {
+      toast.error("Each referee must have a different email address.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api<TutorReferee[]>("/verification/tutor/referees", {
+        method: "POST",
+        body: JSON.stringify({ referees: refereeDrafts }),
+      });
+      setReferees(result);
+      toast.success("Referee consent invitations have been sent.");
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error, "Could not send referee invitations."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshReferees() {
+    setBusy(true);
+    try {
+      const result = await api<TutorReferee[]>("/verification/tutor/referees");
+      setReferees(result);
+      setRefereeDrafts(
+        result.length
+          ? result.map((item) => ({
+              full_name: item.full_name,
+              email: item.email,
+              job_title: item.job_title,
+              relationship_to_tutor: item.relationship_to_tutor,
+            }))
+          : [{ ...EMPTY_REFEREE }, { ...EMPTY_REFEREE }],
+      );
+      toast.success("Referee statuses refreshed.");
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error, "Could not refresh referee statuses."),
       );
     } finally {
       setBusy(false);
@@ -1510,18 +1663,34 @@ export default function TutorOnboardingPage() {
   return (
     <AppShell
       title="Tutor onboarding"
-      description="Create your tutor profile, then complete your verification."
+      description="Complete your tutor profile, verification and referee checks in three guided stages."
     >
       {loading ? (
         <div className="flex min-h-64 items-center justify-center">
           <Loader2 className="animate-spin text-[#1769D2]" size={28} />
         </div>
       ) : (
-        <div className="mx-auto max-w-5xl">
+        <div className="mx-auto max-w-4xl space-y-6">
           <StepIndicator
             currentStep={currentStep}
-            onStepChange={setCurrentStep}
+            onStepChange={(step) => {
+              if (step === 2 && !exists) {
+                toast.error(
+                  "Save your tutor profile before continuing to Stage 2.",
+                );
+                return;
+              }
+              if (step === 3 && !stage2Completed) {
+                toast.error(
+                  "Complete Stage 2 before moving to referee details.",
+                );
+                return;
+              }
+              setCurrentStep(step);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
             profileExists={exists}
+            stage2Completed={stage2Completed}
           />
 
           {/* ================================================================= */}
@@ -1532,7 +1701,7 @@ export default function TutorOnboardingPage() {
             <div className="space-y-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-[#1769D2]">
-                  Step 1 of 2
+                  Stage 1 of 3
                 </p>
                 <h2 className="mt-1 text-xl font-bold text-[#102A56]">
                   Create your professional profile
@@ -1615,7 +1784,7 @@ export default function TutorOnboardingPage() {
                     </Field>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Hourly rate (₦)">
+                      <Field label="Monthly tutoring fee (₦)">
                         <Input
                           type="number"
                           min="1"
@@ -2101,7 +2270,7 @@ export default function TutorOnboardingPage() {
             <div className="space-y-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-[#1769D2]">
-                  Step 2 of 2
+                  Stage 2 of 3
                 </p>
                 <h2 className="mt-1 text-xl font-bold text-[#102A56]">
                   Verify your tutor account
@@ -2370,7 +2539,21 @@ export default function TutorOnboardingPage() {
                       </select>
                     </Field>
 
-                    <form onSubmit={submitVerification} className="space-y-5">
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!acceptNda) {
+                          toast.error(
+                            "Accept the tutor NDA before continuing.",
+                          );
+                          return;
+                        }
+                        setStage2Completed(true);
+                        setCurrentStep(3);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="space-y-5"
+                    >
                       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4">
                         <input
                           type="checkbox"
@@ -2399,6 +2582,10 @@ export default function TutorOnboardingPage() {
                           <li>Your introduction video must be uploaded.</li>
                           <li>Your identity document must be uploaded.</li>
                           <li>You must accept the tutor NDA.</li>
+                          <li>
+                            Provide at least two referees in Stage 3. Their
+                            responses are reviewed by Tutova before approval.
+                          </li>
                         </ul>
 
                         <p className="mt-3 text-xs leading-5 text-slate-500">
@@ -2419,7 +2606,7 @@ export default function TutorOnboardingPage() {
                         ) : (
                           <ShieldCheck size={16} className="mr-2" />
                         )}
-                        {busy ? "Submitting…" : "Submit for verification"}
+                        Continue to Stage 3
                       </Button>
                     </form>
                   </CardContent>
@@ -2438,11 +2625,278 @@ export default function TutorOnboardingPage() {
                   }}
                 >
                   <ChevronLeft size={16} className="mr-2" />
-                  Back to profile
+                  Back to Stage 1
                 </Button>
 
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs leading-5 text-slate-500">
+                    You can return to Stage 1 to update your professional
+                    details.
+                  </p>
+                  {stage2Completed && (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setCurrentStep(3);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    >
+                      Continue to Stage 3{" "}
+                      <ChevronRight size={16} className="ml-2" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 3 && (
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-[#1769D2]">
+                  Stage 3 of 3
+                </p>
+                <h2 className="mt-1 text-xl font-bold text-[#102A56]">
+                  Provide at least two referees
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Provide at least two people who can verify your professional
+                  or personal background. Tutova emails each referee a unique,
+                  secure link. They do not need a Tutova account. Your
+                  application remains pending while Tutova reviews the
+                  responses.
+                </p>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Referee details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={inviteReferees} className="space-y-5">
+                    {refereeDrafts.map((referee, index) => (
+                      <div
+                        key={index}
+                        className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-2"
+                      >
+                        <div className="md:col-span-2 flex items-center justify-between">
+                          <p className="text-sm font-semibold text-[#102A56]">
+                            Referee {index + 1}
+                          </p>
+                          {refereeDrafts.length > 2 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy || verificationIsLocked}
+                              onClick={() =>
+                                setRefereeDrafts((current) =>
+                                  current.filter((_, i) => i !== index),
+                                )
+                              }
+                            >
+                              <Trash2 size={14} className="mr-1" />
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                        <Field label="Full name">
+                          <Input
+                            required
+                            value={referee.full_name}
+                            disabled={verificationIsLocked}
+                            onChange={(event) =>
+                              setRefereeDrafts((current) =>
+                                current.map((item, i) =>
+                                  i === index
+                                    ? { ...item, full_name: event.target.value }
+                                    : item,
+                                ),
+                              )
+                            }
+                            placeholder="Referee's full name"
+                          />
+                        </Field>
+                        <Field label="Email address">
+                          <Input
+                            required
+                            type="email"
+                            value={referee.email}
+                            disabled={verificationIsLocked}
+                            onChange={(event) =>
+                              setRefereeDrafts((current) =>
+                                current.map((item, i) =>
+                                  i === index
+                                    ? { ...item, email: event.target.value }
+                                    : item,
+                                ),
+                              )
+                            }
+                            placeholder="name@example.com"
+                          />
+                        </Field>
+                        <Field label="Job title / occupation">
+                          <Input
+                            required
+                            value={referee.job_title}
+                            disabled={verificationIsLocked}
+                            onChange={(event) =>
+                              setRefereeDrafts((current) =>
+                                current.map((item, i) =>
+                                  i === index
+                                    ? { ...item, job_title: event.target.value }
+                                    : item,
+                                ),
+                              )
+                            }
+                            placeholder="e.g. School Principal"
+                          />
+                        </Field>
+                        <Field label="Relationship to you">
+                          <Input
+                            required
+                            value={referee.relationship_to_tutor}
+                            disabled={verificationIsLocked}
+                            onChange={(event) =>
+                              setRefereeDrafts((current) =>
+                                current.map((item, i) =>
+                                  i === index
+                                    ? {
+                                        ...item,
+                                        relationship_to_tutor:
+                                          event.target.value,
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                            placeholder="e.g. Former supervisor"
+                          />
+                        </Field>
+                      </div>
+                    ))}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={busy || verificationIsLocked}
+                        onClick={() =>
+                          setRefereeDrafts((current) => [
+                            ...current,
+                            { ...EMPTY_REFEREE },
+                          ])
+                        }
+                      >
+                        <Plus size={15} className="mr-2" />
+                        Add another referee
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={busy || verificationIsLocked}
+                      >
+                        {busy
+                          ? "Sending invitations…"
+                          : "Save referees and send email links"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void refreshReferees()}
+                      >
+                        Refresh referee statuses
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Referee response status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {referees.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      No referee invitations have been submitted yet.
+                    </p>
+                  ) : (
+                    referees.map((referee) => (
+                      <div
+                        key={referee.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 p-3"
+                      >
+                        <div>
+                          <p className="font-semibold text-[#102A56]">
+                            {referee.full_name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {referee.email} · {referee.job_title} ·{" "}
+                            {referee.relationship_to_tutor}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${referee.status === "CONSENTED" ? "bg-emerald-50 text-emerald-700" : referee.status === "DECLINED" || referee.status === "EXPIRED" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}
+                        >
+                          {referee.status.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                  <p className="text-xs text-slate-500">
+                    At least two referee invitations must be sent before you
+                    submit. Referee links expire after 14 days. Your application
+                    stays pending until an administrator completes the review;
+                    sending invitations does not mean you are approved.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      disabled={
+                        busy ||
+                        !invitationsDispatched ||
+                        !acceptNda ||
+                        verificationIsLocked
+                      }
+                      onClick={() => void submitVerification()}
+                      className="w-full sm:w-auto"
+                    >
+                      {busy ? (
+                        <Loader2 size={16} className="mr-2 animate-spin" />
+                      ) : (
+                        <ShieldCheck size={16} className="mr-2" />
+                      )}
+                      Submit tutor application for review
+                    </Button>
+                    {consentedRefereeCount > 0 && (
+                      <span className="text-xs text-slate-500">
+                        {consentedRefereeCount} referee response(s) received
+                      </span>
+                    )}
+                  </div>
+                  {verificationIsLocked && (
+                    <p className="text-sm text-blue-700">
+                      Your application is pending administrator review. You will
+                      be notified when a decision is made.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCurrentStep(2);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  <ChevronLeft size={16} className="mr-2" />
+                  Back to Stage 2
+                </Button>
                 <p className="text-xs leading-5 text-slate-500">
-                  You can return to Step 1 to update your professional details.
+                  You can return to earlier stages to review your information.
                 </p>
               </div>
             </div>

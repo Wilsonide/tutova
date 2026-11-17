@@ -1,11 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
-import { Brand } from "@/components/brand";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -75,8 +76,26 @@ export default function TutorRegisterPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Header */}
       <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-6">
-        <Brand />
+        <Link
+          href="/"
+          aria-label="Tutova home"
+          className="inline-flex items-center gap-3 transition-opacity hover:opacity-80"
+        >
+          <Image
+            src="/images/logo.png"
+            alt="Tutova logo"
+            width={180}
+            height={60}
+            priority
+            className="h-12 w-auto object-contain"
+          />
+
+          <span className="text-2xl font-extrabold tracking-tight text-[#102A56]">
+            Tutova<span className="text-[#00AFA0]">.</span>
+          </span>
+        </Link>
 
         <Link
           href="/"
@@ -88,6 +107,7 @@ export default function TutorRegisterPage() {
       </header>
 
       <main className="mx-auto grid max-w-6xl gap-10 px-5 py-8 lg:grid-cols-[.9fr_1.1fr] lg:gap-14 lg:py-16">
+        {/* Introduction panel */}
         <section className="rounded-[2rem] bg-[#102A56] p-8 text-white sm:p-10">
           <span className="inline-flex rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold tracking-wide text-[#56E0D4]">
             TEACH WITH TUTOVA
@@ -119,6 +139,7 @@ export default function TutorRegisterPage() {
           </div>
         </section>
 
+        {/* Registration form */}
         <section className="mx-auto w-full max-w-xl py-2">
           <p className="eyebrow">Tutor registration</p>
 
