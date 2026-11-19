@@ -51,20 +51,18 @@ function TutovaBrand({ light = false }: { light?: boolean }) {
       className="inline-flex w-fit items-center gap-3 transition-opacity hover:opacity-80"
       aria-label="Tutova home"
     >
-      <span className="flex h-[58px] w-[76px] items-center justify-center rounded-xl border border-white/60 bg-white px-2 shadow-lg shadow-black/10">
-        <Image
-          src="/images/logo.png"
-          alt="Tutova logo"
-          width={180}
-          height={60}
-          priority
-          className="h-10 w-full object-contain"
-        />
-      </span>
+      <Image
+        src="/images/logo.png"
+        alt="Tutova logo"
+        width={180}
+        height={60}
+        priority
+        className="h-12 w-auto object-contain"
+      />
 
       <span
         className={`text-2xl font-extrabold tracking-tight ${
-          light ? "text-white" : "text-[#102A56]"
+          light ? "text-[#102A56]" : "text-[#102A56]"
         }`}
       >
         Tutova<span className="text-[#00AFA0]">.</span>
@@ -142,11 +140,11 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-screen bg-white lg:grid-cols-2">
       {/* Desktop branding panel */}
-      <section className="hidden flex-col justify-between bg-[#102A56] p-12 text-white lg:flex">
+      <section className="hidden flex-col justify-between bg-[#EAF3F7] p-12 text-[#102A56] lg:flex">
         <TutovaBrand light />
 
         <div className="max-w-lg">
-          <div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-white/10 text-[#56E0D4]">
+          <div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-[#00AFA0]/10 text-[#008F84]">
             <LockKeyhole size={28} />
           </div>
 
@@ -154,13 +152,13 @@ export default function LoginPage() {
             Your learning journey, all in one place.
           </h1>
 
-          <p className="mt-5 leading-8 text-blue-100">
+          <p className="mt-5 leading-8 text-slate-600">
             Pick up where you left off. Your lessons, tutor conversations and
             progress are ready when you are.
           </p>
         </div>
 
-        <p className="text-xs text-blue-200">
+        <p className="text-xs text-slate-500">
           TUTOVA · The right tutor. A brighter future.
         </p>
       </section>

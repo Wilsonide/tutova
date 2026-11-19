@@ -63,7 +63,7 @@ const tutorNav = [
 
 const adminNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
-  { href: "/admin", label: "Review centre", icon: ClipboardCheck },
+
   {
     href: "/safeguarding",
     label: "Safety & reports",

@@ -23,6 +23,8 @@ import {
   Users,
   UserRound,
   Video,
+  CircleHelp,
+  ChevronDown,
 } from "lucide-react";
 
 /* -------------------------------------------------------------------------- */
@@ -343,6 +345,101 @@ const benefits = [
       "Explore online and in-person tutoring options, depending on tutor availability.",
   },
 ];
+
+/* -------------------------------------------------------------------------- */
+/* Learner and parent FAQs                                                    */
+/* -------------------------------------------------------------------------- */
+
+const learnerFaqs = [
+  {
+    question: "What subjects, levels, and locations does Tutova cover?",
+    answer:
+      "Tutova supports Nursery, Primary, and Secondary students, as well as candidates preparing for JAMB, WAEC, and NECO across core subjects like Mathematics, English, and the Sciences. We operate across Nigeria—online lessons are available nationwide, while in-person tutoring depends on verified tutor availability in your area.",
+  },
+  {
+    question: "How does Tutova ensure my child's safety?",
+    answer:
+      "Every tutor undergoes a strict background check before approval. Tutova verifies and securely keeps their government-issued IDs, credentials, and personal records on file to protect your child and household.",
+  },
+  {
+    question: "How do I pay for tutoring sessions?",
+    answer:
+      "All payments must be made exclusively to Tutova's official company account when selecting a tutor. Funds are held securely and released to the tutor only after the contract is fulfilled, ensuring transparency and protecting your money.",
+  },
+  {
+    question:
+      "What happens if a tutor asks to deal with me directly outside Tutova?",
+    answer:
+      "Do not accept off-platform arrangements. Any agreement or payment made outside Tutova is entirely at your own risk, and Tutova will not be liable for disputes, safety issues, or financial losses resulting from direct dealings.",
+  },
+  {
+    question: "How can I monitor my child's academic progress?",
+    answer:
+      "Tutova provides channels for parents to track progress and share feedback directly with our team. This helps us ensure lessons stay aligned with your child's learning goals.",
+  },
+  {
+    question: "Can I change my child's tutor if we aren't seeing results?",
+    answer:
+      "Yes. If a tutor is not the right fit or your child shows no improvement, you can request a replacement from our pool of verified tutors at any time.",
+  },
+  {
+    question:
+      "What happens if a tutor defaults on our agreed schedule or contract?",
+    answer:
+      "Report the issue to the Tutova team immediately. We will investigate the breach, take appropriate disciplinary action against the tutor, and resolve the disruption for your child.",
+  },
+  {
+    question: "Can I get a refund if I terminate a tutoring contract?",
+    answer:
+      "Yes. If you terminate a contract due to dissatisfaction or a tutor's failure to deliver, Tutova reviews the completed sessions and processes a fair refund for the unused portion of your payment.",
+  },
+  {
+    question: "How does Tutova protect my family's personal data?",
+    answer:
+      "Your personal information is kept strictly confidential and is used solely for tutor matching, verification, and safety purposes. We never share or sell your data to third parties without your consent.",
+  },
+  {
+    question: "How can I reach Tutova for complaints or inquiries?",
+    answer:
+      "Our support team is available 24/7 via our official phone line, email, and social media channels to assist with inquiries, feedback, or urgent complaints.",
+  },
+];
+
+/* -------------------------------------------------------------------------- */
+/* FAQ accordion                                                              */
+/* -------------------------------------------------------------------------- */
+
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-b border-[#E8EDF3] last:border-0">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-5 py-5 text-left"
+      >
+        <span className="text-sm font-semibold leading-6 text-[#243B5A] sm:text-base">
+          {question}
+        </span>
+
+        <ChevronDown
+          size={18}
+          className={`shrink-0 text-[#0077E6] transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {open && (
+        <p className="max-w-3xl pb-5 pr-8 text-sm leading-7 text-slate-500">
+          {answer}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /* Homepage                                                                   */
@@ -1013,6 +1110,61 @@ export default function HomePage() {
               Explore resources
               <ArrowRight className="h-4 w-4" />
             </Link>
+          </div>
+        </section>
+        {/* LEARNER AND PARENT FAQ */}
+        <section
+          id="faqs"
+          className="scroll-mt-24 border-t border-slate-100 bg-white py-20 sm:py-24"
+        >
+          <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[0.75fr_1.25fr] lg:px-10">
+            <div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F0F7FF] text-[#0077E6]">
+                <CircleHelp size={23} />
+              </div>
+
+              <p className="mt-6 text-xs font-bold uppercase tracking-[0.19em] text-[#0077E6]">
+                For parents and learners
+              </p>
+
+              <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-[#102A56]">
+                Got questions? We have answers.
+              </h2>
+
+              <p className="mt-4 text-sm leading-7 text-slate-500 sm:text-base">
+                Everything you need to know about finding tutors, learning,
+                payments, child safety, and using Tutova.
+              </p>
+
+              <p className="mt-6 text-sm leading-7 text-slate-500">
+                Can't find what you're looking for?{" "}
+                <Link
+                  href="/contact"
+                  className="font-semibold text-[#0077E6] transition hover:text-[#0066C7]"
+                >
+                  Contact our support team
+                </Link>
+                .
+              </p>
+
+              <Link
+                href="/discover"
+                className="mt-8 inline-flex items-center gap-2 rounded-xl bg-[#102A56] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#183D75]"
+              >
+                Find a tutor
+                <ArrowRight size={16} />
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-[#E8EDF3] bg-white px-5 sm:px-7">
+              {learnerFaqs.map((faq) => (
+                <FAQItem
+                  key={faq.question}
+                  question={faq.question}
+                  answer={faq.answer}
+                />
+              ))}
+            </div>
           </div>
         </section>
       </main>

@@ -48,6 +48,11 @@ const learnerLinks = [
     href: "/#how-it-works",
     description: "Understand how Tutova connects learners and tutors.",
   },
+  {
+    label: "Frequently asked questions",
+    href: "/#faqs",
+    description: "Find answers to common questions about learning on Tutova.",
+  },
 ];
 
 const tutorLinks = [
@@ -83,13 +88,21 @@ export function SiteHeader() {
 
   const isTutor = user?.role === "TUTOR";
 
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
+
   const isApprovedTutor = isTutor && verificationStatus === "APPROVED";
 
-  const accountHref =
-    isTutor && !isApprovedTutor ? "/tutor/onboarding" : "/dashboard";
+  const accountHref = isAdmin
+    ? "/admin"
+    : isTutor && !isApprovedTutor
+      ? "/tutor/onboarding"
+      : "/dashboard";
 
-  const accountLabel =
-    isTutor && !isApprovedTutor ? "Complete Profile" : "Go to Dashboard";
+  const accountLabel = isAdmin
+    ? "Go to Admin Dashboard"
+    : isTutor && !isApprovedTutor
+      ? "Complete Profile"
+      : "Go to Dashboard";
 
   // Active route detection for dropdown sections.
   function isLinkActive(href: string) {
@@ -237,7 +250,7 @@ export function SiteHeader() {
   };
 
   const desktopDirectLinkClass = (active: boolean) =>
-    `rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all duration-200 ${
+    `rounded-lg px-3 py-2.5 text-[13px] font-semibold leading-none transition-all duration-200 ${
       active
         ? "bg-[#F0F7FF] text-[#0077E6]"
         : "text-slate-700 hover:bg-[#F4F8FB] hover:text-[#0077E6]"

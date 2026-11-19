@@ -1,52 +1,52 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SiteFooter } from "@/components/site-footer";
 import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "About us",
   description:
-    "Discover the belief, mission and people behind Tutova — a learning community where every learner gets a chance to rise.",
+    "Tutova is a learning platform designed for Africa—connecting teachers, learners, and parents to turn education into a journey of confidence and steady growth.",
 };
+
+const problems = [
+  "Children were failing—not from a lack of ability, but because they never got support tailored to how they learn.",
+  "Brilliant teachers were undervalued, underpaid, and struggling to reach the students who needed them most.",
+  "Parents were worried and searching for reliable help they could genuinely trust with their child’s future.",
+  "Students and professionals wanted to grow and pass critical exams, but lacked practical guidance and real test preparation.",
+];
 
 const offerings = [
   {
-    audience: "For children",
-    title: "We find the gap and close it.",
+    audience: "For Children: Closing the Learning Gap",
     description:
-      "Every child learns differently. We provide personalized support that meets your child exactly where they are. We don't rush them or label them. We find where they need help and walk with them until they catch up — and then go ahead.",
-    note: "A child given Time, Attention, and Chance can surprise everyone.",
+      "Every child learns at their own pace. Instead of rushing them or slapping on labels, we meet your child exactly where they are. We identify where they are struggling, walk with them until they catch up, and give them the confidence to move ahead.",
   },
   {
-    audience: "For parents",
-    title: "You are no longer alone.",
+    audience: "For Parents: Peace of Mind and Clarity",
     description:
-      "Tutova bridges the gap between you and your child's learning. You will know what your child is learning, how they are improving, and what they need next. No more guessing. No more worry in silence.",
+      "You shouldn't have to guess how your child is doing in school. Tutova keeps you connected to your child’s progress—showing you what they are learning, where they are improving, and what they need next. No more worrying in silence.",
   },
   {
-    audience: "For tutors",
-    title: "Your knowledge is valuable.",
+    audience: "For Tutors: Respect and Fair Reward",
     description:
-      "We give tutors a platform to teach, to be seen, and to earn with dignity. Your expertise is not wasted here. At Tutova, teaching is respected, rewarded, and celebrated.",
+      "Your expertise matters. Tutova gives educators a dedicated space to teach, reach more students, and earn a dignified income. Here, great teaching is valued and rewarded.",
   },
   {
-    audience: "For students and professionals",
-    title: "Practice until you master it.",
+    audience: "For Students & Professionals: Practice That Builds Mastery",
     description:
-      "We give you access to thousands of past questions and a real opportunity to practise them — not just read them. So you walk into every exam, interview, and opportunity prepared and confident.",
+      "Reading notes isn't enough when stakes are high. We give you access to thousands of past questions and interactive practice tools so you can walk into every exam, certification, or interview prepared and confident.",
   },
   {
-    audience: "For adult learners",
-    title: "It is never too late to learn.",
+    audience: "For Adult Learners: Growth on Your Own Terms",
     description:
-      "Whether you want to learn a new skill, go back to school, or simply grow, Tutova gives you the chance to acquire more knowledge at your own pace, on your own terms.",
+      "It is never too late to pick up a new skill or finish what you started. Whether you are returning to school or upskilling for your career, Tutova lets you learn at your own pace, on your own schedule.",
   },
 ];
 
-const beliefs = [
+const values = [
   [
     "Every child matters.",
-    "No matter their background, school, or starting point.",
+    "Regardless of their background, school, or starting point, every child deserves to be seen.",
   ],
   [
     "Every teacher matters.",
@@ -54,18 +54,18 @@ const beliefs = [
   ],
   [
     "Learning is personal.",
-    "One size never fits all. Every learner deserves a plan made for them.",
+    "One size never fits all. Real progress happens when education adapts to the individual.",
   ],
   [
-    "Access is justice.",
-    "Quality education should not depend on wealth or location.",
+    "Access is everything.",
+    "Quality support shouldn't depend on where you live or how much you earn.",
   ],
 ];
 
 const promises = [
-  ["To every parent", "We will see your child."],
-  ["To every tutor", "We will value your gift."],
-  ["To every learner", "We will give you your chance."],
+  ["To every parent:", "We will see and support your child."],
+  ["To every tutor:", "We will value and reward your gift."],
+  ["To every learner:", "We will give you your chance."],
 ];
 
 function SectionHeading({
@@ -93,35 +93,42 @@ function SectionHeading({
 }
 
 export default function AboutPage() {
-  const problems = [
-    "Too many children struggle not because they cannot learn, but because they have not received the right support.",
-    "Too many brilliant teachers are undervalued, underpaid, and unseen.",
-    "Too many parents are worried and searching for someone they can trust with their child's future.",
-    "Too many adult learners, students, and professionals want to grow but cannot find the right guidance, questions, or practice.",
-  ];
-
-  const differences = [
-    ["We don't just teach subjects.", "We build confidence."],
-    ["We don't just give answers.", "We build understanding."],
-    ["We don't just prepare children for exams.", "We prepare them for life."],
-  ];
-
   return (
     <main className="bg-white text-[#102A56]">
+      {/* Hero / About Tutova */}
       <section className="bg-[#102A56]">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24 lg:px-10 lg:py-28">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#55D8CC]">
             About Tutova
           </p>
+
           <div className="mt-6 max-w-4xl">
             <h1 className="text-4xl font-semibold leading-[1.12] tracking-[-0.045em] text-white sm:text-5xl lg:text-6xl">
               Every child can learn. Every teacher can earn. Every learner
               deserves a chance.
             </h1>
-            <p className="mt-7 max-w-2xl text-base leading-8 text-blue-100 sm:text-lg">
-              We believe learning should open doors, build confidence, and give
-              every person the support they need to reach their potential.
-            </p>
+
+            <div className="mt-7 max-w-3xl space-y-5 text-base leading-8 text-blue-100 sm:text-lg">
+              <p>
+                In crowded classrooms, it is easy for a child to fall behind.
+                Too often, those children are written off as "slow" or "dull,"
+                and nobody stops to ask why.
+              </p>
+
+              <p className="font-semibold text-white">
+                At Tutova, we believe something different: No child is incapable
+                of learning. What they really need is time, attention, and a
+                fair chance.
+              </p>
+
+              <p>
+                Tutova was built on that belief. We are a learning platform
+                designed for Africa—connecting teachers, learners, and parents
+                to turn education from a daily struggle into a journey of
+                confidence and steady growth.
+              </p>
+            </div>
+
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/discover"
@@ -129,6 +136,7 @@ export default function AboutPage() {
               >
                 Find a tutor <ArrowRight size={17} />
               </Link>
+
               <Link
                 href="/register/tutor"
                 className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/35 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55D8CC]"
@@ -140,78 +148,56 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* Why We Started */}
       <section className="px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
         <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#0077E6]">
-              The belief that started it all
+              Why We Started
             </p>
             <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-              No child is dull.
+              We built Tutova to close these gaps.
             </h2>
-            <p className="mt-4 text-lg font-semibold leading-8 text-[#00AFA0]">
-              Every child needs Time, Attention, and Chance.
-            </p>
           </div>
-          <div className="space-y-5 text-base leading-8 text-slate-600">
-            <p>
-              Some children are called dull. Some are called slow. Some are left
-              behind in a crowded classroom and nobody ever stops to ask why.
+
+          <div>
+            <p className="text-base leading-8 text-slate-600">
+              Across our communities, we saw the same disconnect happening every
+              day:
             </p>
-            <p className="font-semibold text-[#102A56]">
-              At Tutova, we know the truth: every learner can make progress when
-              given the right support.
-            </p>
-            <p>
-              Tutova is a learning platform that bridges the gap between
-              teachers, learners, and parents — and turns learning from a
-              struggle into a journey of confidence, growth, and possibility.
-            </p>
-            <p>
-              We are not just another tutoring website. We are a learning
-              community built for Africa, for every home, and for every child
-              who deserves to be seen.
+
+            <ul className="mt-6 divide-y divide-[#E2EAF1] border-y border-[#E2EAF1]">
+              {problems.map((problem, index) => (
+                <li
+                  key={problem}
+                  className="grid gap-2 py-5 sm:grid-cols-[3rem_1fr] sm:gap-5"
+                >
+                  <span className="text-sm font-bold tabular-nums text-[#00AFA0]">
+                    0{index + 1}
+                  </span>
+                  <p className="text-sm leading-7 text-slate-700 sm:text-base">
+                    {problem}
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            <p className="mt-8 text-lg font-semibold">
+              We built Tutova to close these gaps.
             </p>
           </div>
         </div>
       </section>
 
+      {/* How Tutova Helps */}
       <section className="bg-[#F4F8FB] px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
         <div className="mx-auto max-w-6xl">
           <SectionHeading
-            eyebrow="The problem we saw"
-            title="Potential is everywhere. The right support isn't."
-            description="Too many learners and educators are held back by gaps that the right guidance, attention, and opportunity can help close."
+            eyebrow="How Tutova Helps"
+            title="Tutova connects the people who want to learn with the people who know how to teach."
           />
-          <ul className="mt-10 divide-y divide-[#DCE7F0] border-y border-[#DCE7F0]">
-            {problems.map((problem, index) => (
-              <li
-                key={problem}
-                className="grid gap-2 py-5 sm:grid-cols-[3rem_1fr] sm:gap-5"
-              >
-                <span className="text-sm font-bold tabular-nums text-[#00AFA0]">
-                  0{index + 1}
-                </span>
-                <p className="max-w-4xl text-sm leading-7 text-slate-700 sm:text-base">
-                  {problem}
-                </p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-8 text-lg font-semibold">
-            We saw that gap. And we decided to close it.
-          </p>
-        </div>
-      </section>
 
-      <section className="px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
-        <div className="mx-auto max-w-6xl">
-          <SectionHeading
-            eyebrow="What Tutova does"
-            title="Connecting the people who need learning with the people who can teach it."
-            description="Tutova brings learners, parents, and tutors together around the support, practice, and opportunity each person needs."
-          />
-          <div className="mt-10 divide-y divide-[#E2EAF1] border-y border-[#E2EAF1]">
+          <div className="mt-10 divide-y divide-[#DCE7F0] border-y border-[#DCE7F0]">
             {offerings.map((item, index) => (
               <article
                 key={item.audience}
@@ -220,84 +206,74 @@ export default function AboutPage() {
                 <span className="pt-1 text-sm font-bold tabular-nums text-[#00AFA0]">
                   0{index + 1}
                 </span>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#0077E6]">
-                    {item.audience}
-                  </p>
-                  <h3 className="mt-2 text-lg font-semibold leading-snug">
-                    {item.title}
-                  </h3>
-                </div>
-                <div>
-                  <p className="text-sm leading-7 text-slate-600">
-                    {item.description}
-                  </p>
-                  {item.note && (
-                    <p className="mt-3 text-sm font-semibold leading-6 text-[#087F78]">
-                      {item.note}
-                    </p>
-                  )}
-                </div>
+
+                <h3 className="text-lg font-semibold leading-snug">
+                  {item.audience}
+                </h3>
+
+                <p className="text-sm leading-7 text-slate-600 sm:text-base">
+                  {item.description}
+                </p>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-[#F4F8FB] px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
+      {/* Our Mission & Vision */}
+      <section className="px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
         <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-2 lg:gap-20">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#0077E6]">
-              Our mission
+              Our Mission
             </p>
+
             <h2 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-              Leave no learner behind.
+              To leave no learner behind.
             </h2>
+
             <p className="mt-5 text-sm leading-8 text-slate-600 sm:text-base">
-              To ensure that every child gets support in the areas where they
-              need it. To give every child equal access to quality education in
-              line with the United Nations Sustainable Development Goal 4 —
-              Quality Education for All. And to give teachers a platform to
-              share their expertise and earn from it.
-            </p>
-            <p className="mt-4 font-semibold">
-              Our mission is simple: leave no learner behind.
+              Aligned with the United Nations Sustainable Development Goal 4
+              (Quality Education for All), we exist to give every learner
+              targeted support while empowering teachers to share their
+              knowledge and earn sustainably.
             </p>
           </div>
+
           <div className="border-t-2 border-[#00AFA0] pt-7 lg:border-l-2 lg:border-t-0 lg:pl-10 lg:pt-0">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#0077E6]">
-              Our vision
+              Our Vision
             </p>
+
             <h2 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-              A brighter future for every learner.
+              To become Africa’s most trusted learning community.
             </h2>
+
             <p className="mt-5 text-sm leading-8 text-slate-600 sm:text-base">
-              To become Africa's leading learning community and the trusted home
-              where every child is supported, every teacher is valued, and every
-              learner — young or adult — has the opportunity to reach their full
-              potential.
-            </p>
-            <p className="mt-4 font-semibold">
-              Quality education should be a right for all, not a privilege for a
-              few.
+              A future where quality education isn't a privilege for a few, but
+              an accessible right for every home.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
+      {/* What Drives Us */}
+      <section className="bg-[#F4F8FB] px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
         <div className="mx-auto max-w-6xl">
           <SectionHeading
-            eyebrow="What we believe"
-            title="A learning community built on people-first values."
+            eyebrow="What Drives Us"
+            title="The values behind our learning community."
           />
+
           <div className="mt-10 grid gap-x-12 sm:grid-cols-2">
-            {beliefs.map(([title, description], index) => (
-              <div key={title} className="border-t border-[#E2EAF1] py-6">
+            {values.map(([title, description], index) => (
+              <div key={title} className="border-t border-[#DCE7F0] py-6">
                 <p className="text-xs font-bold tabular-nums text-[#00AFA0]">
                   0{index + 1}
                 </p>
+
                 <h3 className="mt-2 text-lg font-semibold">{title}</h3>
+
                 <p className="mt-2 text-sm leading-7 text-slate-600">
                   {description}
                 </p>
@@ -307,34 +283,25 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="bg-[#F4F8FB] px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-24">
-        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
-          <SectionHeading
-            eyebrow="Why Tutova is different"
-            title="More than lessons. A foundation for life."
-            description="At Tutova, your child is not a number. Your child is a name, a story, and a future."
-          />
-          <div className="divide-y divide-[#DCE7F0] border-y border-[#DCE7F0]">
-            {differences.map(([first, second]) => (
-              <div key={first} className="py-5">
-                <p className="text-sm text-slate-500">{first}</p>
-                <p className="mt-1 text-lg font-semibold">{second}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
+      {/* Our Promise */}
       <section className="bg-[#102A56] px-5 py-16 text-white sm:px-8 sm:py-20 lg:px-10 lg:py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
+          <div className="max-w-3xl">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#55D8CC]">
-              Our promise to you
+              Our Promise
             </p>
+
             <h2 className="mt-3 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">
-              Every learner deserves to be seen.
+              At Tutova, we don't just teach subjects—we build confidence.
             </h2>
+
+            <p className="mt-5 text-base leading-8 text-blue-100">
+              We don't just hand out answers—we build real understanding. To us,
+              your child is never just a number in a classroom; they are a name,
+              a story, and a future.
+            </p>
           </div>
+
           <div className="mt-9 grid gap-6 border-y border-white/20 py-7 sm:grid-cols-3 sm:gap-8">
             {promises.map(([audience, promise]) => (
               <div key={audience}>
@@ -345,13 +312,15 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
+
           <div className="mt-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-xl font-semibold">Welcome to Tutova.</p>
-              <p className="mt-2 text-sm leading-7 text-blue-100">
-                Where learning meets love, and every learner rises.
+              <p className="text-xl font-semibold">
+                Welcome to Tutova—where learning meets care, and every learner
+                rises.
               </p>
             </div>
+
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/register"
@@ -359,6 +328,7 @@ export default function AboutPage() {
               >
                 Get started <ArrowRight size={17} />
               </Link>
+
               <Link
                 href="/discover"
                 className="inline-flex min-h-12 items-center justify-center rounded-md border border-white/35 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#55D8CC]"
@@ -368,6 +338,15 @@ export default function AboutPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Brand closing line */}
+      <section className="border-t border-[#E2EAF1] px-5 py-6 text-center sm:px-8">
+        <p className="text-xs font-semibold tracking-wide text-[#102A56] sm:text-sm">
+          Every Child Can Learn <span className="mx-2 text-[#00AFA0]">•</span>
+          Every Teacher Can Earn <span className="mx-2 text-[#00AFA0]">•</span>
+          Every Learner Deserves A Chance
+        </p>
       </section>
     </main>
   );

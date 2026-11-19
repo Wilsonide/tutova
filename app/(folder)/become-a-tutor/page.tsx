@@ -150,42 +150,55 @@ const faqs = [
   {
     question: "Who can become a tutor on Tutova?",
     answer:
-      "Tutova welcomes applicants with relevant subject knowledge, suitable educational backgrounds, or teaching experience who can provide quality learning support. All applicants must complete the verification and approval process.",
+      "Tutova welcomes applicants with strong subject knowledge, relevant educational qualifications, or teaching experience who can deliver quality learning support. All applicants must pass our verification and approval process before teaching.",
   },
   {
-    question: "Can I teach online and in person?",
+    question: "Is there a registration fee to join Tutova?",
     answer:
-      "Yes. You can indicate whether you offer online tutoring, in-person tutoring, or both. In-person opportunities depend on learner location and the areas you are willing to serve.",
+      "No. Registration on Tutova is completely free. We provide a fair, merit-based platform where qualified educators can showcase their expertise without upfront charges.",
   },
   {
-    question: "Do I need teaching experience?",
+    question: "Do I need formal teaching experience to apply?",
     answer:
-      "Teaching experience can strengthen your application, but it is not the only consideration. Your subject knowledge, educational background, communication skills, and ability to support learners are also important. All applications are reviewed by the Tutova team.",
+      "While teaching experience strengthens your application, it is not mandatory. Our review team also evaluates your subject mastery, academic background, communication skills, and ability to support learners effectively.",
   },
   {
-    question: "How much of the lesson fee do tutors receive?",
+    question:
+      "How long does the verification process take, and what happens if fake documents are submitted?",
     answer:
-      "Tutova uses a tiered earnings structure. Beginner tutors receive 75% of the applicable lesson fee, developing tutors receive 80%, and experienced tutors can qualify for 85%. Progression depends on completed teaching hours and meeting the applicable performance and conduct requirements.",
+      "Verification takes approximately 1 to 3 weeks, depending on how quickly your credentials can be confirmed. Submitting falsified documents results in immediate termination and reporting to relevant Nigerian security authorities, in compliance with the law.",
   },
   {
-    question: "How do I qualify for the 85% earnings tier?",
+    question: "Can I teach both online and in person?",
     answer:
-      "Tutors must complete more than 50 verified teaching hours and maintain the required standards for teaching quality, reliability, and professional conduct. Reaching the hour milestone alone does not automatically guarantee progression.",
+      "Yes. You can choose to offer online tutoring, in-person lessons, or both. Online lessons are open to learners nationwide, while in-person placements depend on student demand within your preferred locations.",
   },
   {
-    question: "Are completed teaching hours counted automatically?",
+    question: "Does approval guarantee immediate tutoring requests?",
     answer:
-      "Only lessons recorded as completed and confirmed through Tutova count towards your teaching-hour total. Cancelled, missed, or unconfirmed lessons do not count as completed teaching hours.",
+      "No. Approval qualifies your profile to be matched with learners, but actual lesson requests depend on parent demand, subject needs, your availability, and location compatibility.",
   },
   {
-    question: "When do I receive my earnings?",
+    question: "How much of the lesson fee do tutors earn?",
     answer:
-      "Tutova manages tutor payouts through its payment process. Earnings are subject to lesson completion, payment confirmation, and applicable payout procedures.",
+      "Tutova operates a three-tier earnings structure based on performance and experience: Beginner Tutors receive 75% of the applicable lesson fee; Developing Tutors receive 80%; and Experienced Tutors receive 85%. The Experienced tier requires completing over 50 verified teaching hours while maintaining high standards of reliability, conduct, and teaching quality.",
   },
   {
-    question: "Does registering guarantee tutoring requests?",
+    question: "How are my teaching hours tracked and paid out?",
     answer:
-      "No. Registration and approval allow your profile to be considered for listing. Actual requests depend on learner demand, subject requirements, location, availability, and other matching factors.",
+      "Only lessons completed and confirmed on Tutova count toward your teaching hours—cancelled, missed, or unconfirmed sessions are excluded. Payouts are processed through Tutova's official payment system once lessons are completed and confirmed.",
+  },
+  {
+    question:
+      "Can I communicate or arrange payments with parents outside Tutova?",
+    answer:
+      "No. All communication, scheduling, and payments must remain strictly on Tutova. Off-platform arrangements void your payment protection, prevent your hours from being logged, and violate platform policy.",
+  },
+  {
+    question:
+      "What happens if I default on a contract, or face assault or false allegations?",
+    answer:
+      "If a tutor defaults on an agreed contract, Tutova will investigate and issue a warning, suspension, or permanent removal depending on the findings. Conversely, if a tutor experiences assault or a false allegation, our team conducts a thorough investigation—any party found guilty of false accusations or misconduct is removed from the platform and reported to security authorities.",
   },
 ];
 
@@ -959,23 +972,38 @@ export default function BecomeATutorPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F0F7FF] text-[#0077E6]">
               <CircleHelp size={23} />
             </div>
-            <h2 className="mt-5 text-2xl font-bold text-[#102A56] sm:text-3xl">
-              Frequently asked questions
-            </h2>
-            <p className="mt-4 text-sm leading-7 text-slate-500">
-              Find answers to common questions about tutor registration,
-              verification, teaching, and earnings.
+
+            <p className="mt-6 text-xs font-bold uppercase tracking-[0.19em] text-[#00AFA0]">
+              For tutors
             </p>
-            <p className="mt-6 text-sm text-slate-500">
+
+            <h2 className="mt-3 text-2xl font-bold leading-tight text-[#102A56] sm:text-3xl">
+              Got questions? We have answers.
+            </h2>
+
+            <p className="mt-4 text-sm leading-7 text-slate-500">
+              Everything you need to know about applying, tutor verification,
+              teaching opportunities, earnings, and platform policies.
+            </p>
+
+            <p className="mt-6 text-sm leading-7 text-slate-500">
               Still need help?{" "}
               <Link
                 href="/contact"
-                className="font-semibold text-[#0077E6] hover:text-[#0066C7]"
+                className="font-semibold text-[#0077E6] transition hover:text-[#0066C7]"
               >
-                Contact our team
+                Contact our support team
               </Link>
               .
             </p>
+
+            <Link
+              href="/register/tutor"
+              className="mt-8 inline-flex items-center gap-2 rounded-xl bg-[#102A56] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#183D75]"
+            >
+              Start your application
+              <ArrowRight size={16} />
+            </Link>
           </div>
 
           <div className="rounded-2xl border border-[#E8EDF3] bg-white px-5 sm:px-7">

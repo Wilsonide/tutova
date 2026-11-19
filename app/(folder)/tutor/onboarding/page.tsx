@@ -124,6 +124,7 @@ type VideoUploadSignatureResponse = {
   timestamp: number;
   signature: string;
   public_id: string;
+  overwrite: boolean;
 };
 
 type CloudinaryVideoUploadResponse = {
@@ -1266,7 +1267,7 @@ export default function TutorOnboardingPage() {
     setUploading("video");
 
     try {
-      // Step 1: Ask FastAPI for a signed, tutor-specific Cloudinary upload.
+      // Step 1: Request a signed upload with a unique public_id.
       const authorization = await api<VideoUploadSignatureResponse>(
         "/tutors/profile/introduction-video/signature",
         {
@@ -1274,14 +1275,14 @@ export default function TutorOnboardingPage() {
         },
       );
 
-      // Step 2: Upload the actual video directly to Cloudinary.
-      // The video does not pass through Vercel or FastAPI.
+      // Step 2: Upload directly to Cloudinary.
       const cloudinaryForm = new FormData();
 
       cloudinaryForm.append("file", file);
       cloudinaryForm.append("api_key", authorization.api_key);
       cloudinaryForm.append("timestamp", String(authorization.timestamp));
       cloudinaryForm.append("public_id", authorization.public_id);
+      cloudinaryForm.append("overwrite", "false");
       cloudinaryForm.append("signature", authorization.signature);
 
       const cloudinaryResponse = await fetch(
@@ -1296,7 +1297,16 @@ export default function TutorOnboardingPage() {
 
       const cloudinaryResult =
         (await cloudinaryResponse.json()) as CloudinaryVideoUploadResponse;
-
+      console.error("Cloudinary upload response:", {
+        status: cloudinaryResponse.status,
+        statusText: cloudinaryResponse.statusText,
+        body: cloudinaryResult,
+        authorization: {
+          timestamp: authorization.timestamp,
+          public_id: authorization.public_id,
+          cloud_name: authorization.cloud_name,
+        },
+      });
       if (!cloudinaryResponse.ok) {
         throw new Error(
           cloudinaryResult.error?.message ??
@@ -1311,8 +1321,7 @@ export default function TutorOnboardingPage() {
         throw new Error("The uploaded video could not be verified.");
       }
 
-      // Step 3: Ask FastAPI to verify the Cloudinary asset and save it.
-      // Never save the browser-provided secure_url directly.
+      // Step 3: Verify the uploaded asset and save its public_id.
       const response = await api<UploadResponse>(
         "/tutors/profile/introduction-video/complete",
         {
@@ -1339,7 +1348,6 @@ export default function TutorOnboardingPage() {
       setUploading(null);
     }
   }
-
   async function removeIntroductionVideo() {
     if (!exists) return;
 
