@@ -1,12 +1,8 @@
 "use client";
 
-
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
-
-
 
 import { AppShell } from "@/components/app-shell";
 
@@ -28,23 +24,15 @@ import { toast } from "sonner";
 
 import { AlertTriangle, X } from "lucide-react";
 
-
-
 type VerificationStatus =
-
   | "NOT_SUBMITTED"
-
   | "PENDING_REVIEW"
-
   | "CHANGES_REQUESTED"
-
   | "APPROVED"
-
   | "REJECTED";
 
-
-
 type Verification = {
+  [x: string]: any;
 
   id: string;
 
@@ -63,13 +51,9 @@ type Verification = {
   reviewed_at: string | null;
 
   review_notes: string | null;
-
 };
 
-
-
 type Referee = {
-
   id: string;
 
   full_name: string;
@@ -87,17 +71,11 @@ type Referee = {
   consented_at: string | null;
 
   responded_at: string | null;
-
 };
-
-
 
 type PayoutStatus = "REQUESTED" | "PROCESSING" | "PAID" | "FAILED" | "REVERSED";
 
-
-
 type Payout = {
-
   id: string;
 
   tutor_profile_id: string;
@@ -117,31 +95,19 @@ type Payout = {
   paid_at: string | null;
 
   created_at: string;
-
 };
-
-
 
 type ReviewDecision = "APPROVED" | "REJECTED" | "CHANGES_REQUESTED";
 
-
-
 type IdentityDocumentDownload = {
-
   download_url: string;
 
   expires_in_seconds: number;
-
 };
-
-
 
 type UserStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED" | "PENDING_VERIFICATION";
 
-
-
 type AdminTutorProfile = {
-
   id: string;
 
   user_id: string;
@@ -167,13 +133,9 @@ type AdminTutorProfile = {
   created_at: string;
 
   updated_at: string;
-
 };
 
-
-
 type AdminTutor = {
-
   user_id: string;
 
   first_name: string;
@@ -202,40 +164,25 @@ type AdminTutor = {
 
   tutor_profile: AdminTutorProfile | null;
 
-
-
   // Backend-computed completion information
 
   profile_completed: boolean;
 
   missing_profile_fields: string[];
 
-
-
   verification_completed: boolean;
 
   missing_verification_fields: string[];
 
-
-
   ready_for_verification: boolean;
-
 };
 
-
-
 type TutorPane =
-
   | "incomplete_profiles"
-
   | "incomplete_verification"
-
   | "pending_verification";
 
-
-
 type AdminTutorList = {
-
   items: AdminTutor[];
 
   total: number;
@@ -245,17 +192,11 @@ type AdminTutorList = {
   per_page: number;
 
   total_pages: number;
-
 };
-
-
 
 type RefundStatus = "PENDING" | "PROCESSING" | "PROCESSED" | "FAILED";
 
-
-
 type Refund = {
-
   id: string;
 
   payment_id: string;
@@ -279,71 +220,40 @@ type Refund = {
   processed_at: string | null;
 
   created_at: string;
-
 };
 
-
-
 type TutorStatusConfirmation = {
-
   tutor: AdminTutor;
 
   status: "SUSPENDED" | "INACTIVE";
-
 };
-
-
 
 const PAGE_SIZE = 10;
 
-
-
 function formatDate(value: string | null | undefined) {
-
   if (!value) return "Unavailable";
-
-
 
   const date = new Date(value);
 
-
-
   return Number.isNaN(date.getTime()) ? "Unavailable" : date.toLocaleString();
-
 }
 
-
-
 function formatRate(value: number | null) {
-
   if (value === null || value === undefined) return "Not set";
 
-
-
   return `₦${Number(value).toLocaleString("en-NG", {
-
     minimumFractionDigits: 2,
 
     maximumFractionDigits: 2,
-
   })} / hour`;
-
 }
-
-
 
 function formatList(values: string[] | null | undefined) {
-
   return values?.length ? values.join(", ") : "Not provided";
-
 }
 
-
-
 function statusClass(status: string) {
-
   switch (status) {
-
     case "ACTIVE":
 
     case "APPROVED":
@@ -351,7 +261,6 @@ function statusClass(status: string) {
     case "PAID":
 
     case "PROCESSED":
-
       return "border-green-200 bg-green-50 text-green-700";
 
     case "PENDING_REVIEW":
@@ -361,7 +270,6 @@ function statusClass(status: string) {
     case "PROCESSING":
 
     case "REQUESTED":
-
       return "border-amber-200 bg-amber-50 text-amber-700";
 
     case "SUSPENDED":
@@ -371,23 +279,15 @@ function statusClass(status: string) {
     case "FAILED":
 
     case "REVERSED":
-
       return "border-red-200 bg-red-50 text-red-700";
 
     default:
-
       return "border-slate-200 bg-slate-50 text-slate-600";
-
   }
-
 }
 
-
-
 function formatRequirement(value: string) {
-
   const labels: Record<string, string> = {
-
     bio: "Biography",
 
     qualifications: "Qualifications",
@@ -401,8 +301,6 @@ function formatRequirement(value: string) {
     subjects: "Subjects",
 
     locations: "Teaching locations",
-
-
 
     profile_picture: "Profile picture",
 
@@ -421,34 +319,24 @@ function formatRequirement(value: string) {
     submitted_at: "Verification submission",
 
     resubmit_verification: "Verification resubmission",
-
   };
 
-
-
   return (
-
     labels[value] ??
-
     value.replaceAll("_", " ").replace(/^./, (char) => char.toUpperCase())
-
   );
-
 }
-
-
 
 type AdminSection = "tutors" | "verification" | "payments";
 
 export default function AdminConsole({ section }: { section: AdminSection }) {
-
   const { user } = useAuth();
-
-
 
   const [checks, setChecks] = useState<Verification[]>([]);
 
-  const [refereesByVerification, setRefereesByVerification] = useState<Record<string, Referee[]>>({});
+  const [refereesByVerification, setRefereesByVerification] = useState<
+    Record<string, Referee[]>
+  >({});
 
   const [loadingReferees, setLoadingReferees] = useState<string | null>(null);
 
@@ -458,18 +346,13 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
 
   const [refunds, setRefunds] = useState<Refund[]>([]);
 
-
-
   const [tutorSearch, setTutorSearch] = useState("");
 
-const [tutorStatusFilter, setTutorStatusFilter] = useState("");
+  const [tutorStatusFilter, setTutorStatusFilter] = useState("");
 
-const [tutorPage, setTutorPage] = useState(1);
+  const [tutorPage, setTutorPage] = useState(1);
 
-
-
-const [tutorPane, setTutorPane] =
-  useState<TutorPane>("pending_verification");
+  const [tutorPane, setTutorPane] = useState<TutorPane>("pending_verification");
 
   const filteredTutors = useMemo(() => {
     const query = tutorSearch.trim().toLowerCase();
@@ -477,11 +360,14 @@ const [tutorPane, setTutorPane] =
     return allTutors.filter((tutor) => {
       const matchesSearch =
         !query ||
-        `${tutor.first_name} ${tutor.last_name}`.toLowerCase().includes(query) ||
+        `${tutor.first_name} ${tutor.last_name}`
+          .toLowerCase()
+          .includes(query) ||
         tutor.email.toLowerCase().includes(query) ||
         (tutor.phone_number || "").toLowerCase().includes(query);
 
-      const matchesStatus = !tutorStatusFilter || tutor.status === tutorStatusFilter;
+      const matchesStatus =
+        !tutorStatusFilter || tutor.status === tutorStatusFilter;
       const matchesPane =
         tutorPane === "incomplete_profiles"
           ? !tutor.profile_completed
@@ -498,16 +384,13 @@ const [tutorPane, setTutorPane] =
   const tutorTotal = filteredTutors.length;
   const tutorTotalPages = Math.max(1, Math.ceil(tutorTotal / PAGE_SIZE));
   const tutors = useMemo(
-    () => filteredTutors.slice((tutorPage - 1) * PAGE_SIZE, tutorPage * PAGE_SIZE),
+    () =>
+      filteredTutors.slice((tutorPage - 1) * PAGE_SIZE, tutorPage * PAGE_SIZE),
     [filteredTutors, tutorPage],
   );
 
-
   const [statusConfirmation, setStatusConfirmation] =
-
     useState<TutorStatusConfirmation | null>(null);
-
-
 
   const [refundPaymentId, setRefundPaymentId] = useState("");
 
@@ -515,13 +398,9 @@ const [tutorPane, setTutorPane] =
 
   const [refundReason, setRefundReason] = useState("");
 
-
-
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const [otpValues, setOtpValues] = useState<Record<string, string>>({});
-
-
 
   const [loading, setLoading] = useState(true);
 
@@ -539,622 +418,361 @@ const [tutorPane, setTutorPane] =
 
   const [openingDocument, setOpeningDocument] = useState<string | null>(null);
 
-
-
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPER_ADMIN";
 
-
-
   const load = useCallback(
-
-  async (showRefreshState = false) => {
-
-    if (showRefreshState) {
-
-      setRefreshing(true);
-
-    } else {
-
-      setLoading(true);
-
-    }
-
-
-
-    try {
-
-      const [
-        verificationResult,
-        payoutResult,
-        refundResult,
-        tutorDirectoryResult,
-      ] = await Promise.allSettled([
-        api<Verification[]>("/verification/admin/pending?limit=100"),
-        api<Payout[]>("/payments/admin/payouts"),
-        api<Refund[]>("/payments/admin/refunds"),
-        api<AdminTutorList>(`/admin/tutors?page=1&per_page=${PAGE_SIZE}`),
-      ]);
-
-      const errors: string[] = [];
-
-
-
-      if (verificationResult.status === "fulfilled") {
-
-        setChecks(verificationResult.value);
-
+    async (showRefreshState = false) => {
+      if (showRefreshState) {
+        setRefreshing(true);
       } else {
-
-        errors.push("verification queue");
-
+        setLoading(true);
       }
 
+      try {
+        const [
+          verificationResult,
+          payoutResult,
+          refundResult,
+          tutorDirectoryResult,
+        ] = await Promise.allSettled([
+          api<Verification[]>("/verification/admin/pending?limit=100"),
+          api<Payout[]>("/payments/admin/payouts"),
+          api<Refund[]>("/payments/admin/refunds"),
+          api<AdminTutorList>(`/admin/tutors?page=1&per_page=${PAGE_SIZE}`),
+        ]);
 
+        const errors: string[] = [];
 
-      if (payoutResult.status === "fulfilled") {
-
-        setPayouts(payoutResult.value);
-
-      } else {
-
-        errors.push("payout records");
-
-      }
-
-
-
-      if (refundResult.status === "fulfilled") {
-
-        setRefunds(refundResult.value);
-
-      } else {
-
-        errors.push("refund records");
-
-      }
-
-
-
-      if (tutorDirectoryResult.status === "fulfilled") {
-        try {
-          const firstPage = tutorDirectoryResult.value;
-          const directory = [...firstPage.items];
-          const totalPages = Math.max(1, firstPage.total_pages || 1);
-
-          if (totalPages > 1) {
-            const remainingPages = await Promise.all(
-              Array.from({ length: totalPages - 1 }, (_, index) =>
-                api<AdminTutorList>(
-                  `/admin/tutors?page=${index + 2}&per_page=${PAGE_SIZE}`,
-                ),
-              ),
-            );
-            for (const page of remainingPages) directory.push(...page.items);
-          }
-
-          setAllTutors(directory);
-        } catch {
-          errors.push("complete tutor directory");
+        if (verificationResult.status === "fulfilled") {
+          setChecks(verificationResult.value);
+        } else {
+          errors.push("verification queue");
         }
-      } else {
-        errors.push("tutor directory");
+
+        if (payoutResult.status === "fulfilled") {
+          setPayouts(payoutResult.value);
+        } else {
+          errors.push("payout records");
+        }
+
+        if (refundResult.status === "fulfilled") {
+          setRefunds(refundResult.value);
+        } else {
+          errors.push("refund records");
+        }
+
+        if (tutorDirectoryResult.status === "fulfilled") {
+          try {
+            const firstPage = tutorDirectoryResult.value;
+            const directory = [...firstPage.items];
+            const totalPages = Math.max(1, firstPage.total_pages || 1);
+
+            if (totalPages > 1) {
+              const remainingPages = await Promise.all(
+                Array.from({ length: totalPages - 1 }, (_, index) =>
+                  api<AdminTutorList>(
+                    `/admin/tutors?page=${index + 2}&per_page=${PAGE_SIZE}`,
+                  ),
+                ),
+              );
+              for (const page of remainingPages) directory.push(...page.items);
+            }
+
+            setAllTutors(directory);
+          } catch {
+            errors.push("complete tutor directory");
+          }
+        } else {
+          errors.push("tutor directory");
+        }
+
+        if (errors.length) {
+          toast.error(`Could not load: ${errors.join(", ")}.`);
+        }
+      } finally {
+        setLoading(false);
+
+        setRefreshing(false);
       }
+    },
 
-      if (errors.length) {
-
-        toast.error(
-
-          `Could not load: ${errors.join(", ")}.`,
-
-        );
-
-      }
-
-    } finally {
-
-      setLoading(false);
-
-      setRefreshing(false);
-
-    }
-
-  },
-
-  [],
-
-);
-
-
+    [],
+  );
 
   useEffect(() => {
-
     if (isAdmin) {
-
       void load();
-
     } else {
-
       setLoading(false);
-
     }
-
   }, [isAdmin, load]);
 
-
-
   async function review(id: string, decision: ReviewDecision) {
-
     const reviewNotes = (notes[id] || "").trim();
 
-
-
     if (
-
       (decision === "REJECTED" || decision === "CHANGES_REQUESTED") &&
-
       !reviewNotes
-
     ) {
-
       toast.error("Review notes are required for this decision.");
 
       return;
-
     }
-
-
 
     setBusyVerification(id);
 
-
-
     try {
-
       await api(`/verification/admin/${id}/review`, {
-
         method: "POST",
 
         body: JSON.stringify({
-
           decision,
 
           review_notes: reviewNotes || null,
-
         }),
-
       });
 
-
-
       toast.success(
-
         decision === "APPROVED"
-
           ? "Tutor verification approved"
-
           : decision === "REJECTED"
-
             ? "Tutor verification rejected"
-
             : "Changes requested successfully",
-
       );
 
-
-
       setNotes((current) => {
-
         const updated = { ...current };
 
         delete updated[id];
 
         return updated;
-
       });
 
-
-
       await load(true);
-
     } catch (error) {
-
       toast.error(error instanceof Error ? error.message : "Review failed");
-
     } finally {
-
       setBusyVerification(null);
-
     }
-
   }
 
-
-
   async function loadReferees(verificationId: string) {
-
     setLoadingReferees(verificationId);
 
     try {
+      const result = await api<Referee[]>(
+        `/verification/admin/${verificationId}/referees`,
+      );
 
-      const result = await api<Referee[]>(`/verification/admin/${verificationId}/referees`);
-
-      setRefereesByVerification((current) => ({ ...current, [verificationId]: result }));
-
+      setRefereesByVerification((current) => ({
+        ...current,
+        [verificationId]: result,
+      }));
     } catch (error) {
-
-      toast.error(error instanceof Error ? error.message : "Could not load referee records");
-
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not load referee records",
+      );
     } finally {
-
       setLoadingReferees(null);
-
     }
-
   }
-
-
 
   async function openIdentityDocument(verificationId: string) {
-
     setOpeningDocument(verificationId);
 
-
-
     try {
-
       const result = await api<IdentityDocumentDownload>(
-
         `/verification/admin/${verificationId}/identity-document`,
-
       );
-
-
 
       if (!result.download_url) {
-
         throw new Error("The document download link was not returned.");
-
       }
 
-
-
       window.open(result.download_url, "_blank", "noopener,noreferrer");
-
     } catch (error) {
-
       toast.error(
-
         error instanceof Error
-
           ? error.message
-
           : "Could not open identity document",
-
       );
-
     } finally {
-
       setOpeningDocument(null);
-
     }
-
   }
 
-
-
   async function updateTutorStatus(tutor: AdminTutor, status: UserStatus) {
-
     if (tutor.status === status) return;
-
-
 
     setBusyTutor(tutor.user_id);
 
-
-
     try {
-
       await api(`/admin/tutors/${tutor.user_id}/status`, {
-
         method: "PATCH",
 
         body: JSON.stringify({ status }),
-
       });
 
-
-
       toast.success(
-
         status === "ACTIVE"
-
           ? "Tutor account activated."
-
           : status === "SUSPENDED"
-
             ? "Tutor account suspended."
-
             : "Tutor account deactivated.",
-
       );
-
-
 
       setStatusConfirmation(null);
 
       await load(true);
-
     } catch (error) {
-
       toast.error(
-
         error instanceof Error
-
           ? error.message
-
           : "Could not update tutor status",
-
       );
-
     } finally {
-
       setBusyTutor(null);
-
     }
-
   }
 
-
-
   function requestTutorStatusChange(
-
     tutor: AdminTutor,
 
     status: "SUSPENDED" | "INACTIVE",
-
   ) {
-
     if (tutor.status === status) return;
 
     setStatusConfirmation({ tutor, status });
-
   }
 
-
-
   async function confirmTutorStatusChange() {
-
     if (!statusConfirmation) return;
 
-
-
     await updateTutorStatus(
-
       statusConfirmation.tutor,
 
       statusConfirmation.status,
-
     );
-
   }
-
-
 
   async function processPayout(payout: Payout) {
-
     if (payout.status !== "REQUESTED") return;
 
-
-
     setBusyPayout(payout.id);
 
-
-
     try {
-
       await api(`/payments/admin/payouts/${payout.id}/process`, {
-
         method: "POST",
-
       });
-
-
 
       toast.success("Payout processing request submitted.");
-
     } catch (error) {
-
       toast.error(
-
         error instanceof Error ? error.message : "Could not process payout",
-
       );
-
     } finally {
-
       await load(true);
 
       setBusyPayout(null);
-
     }
-
   }
-
-
 
   async function retryPayout(payout: Payout) {
-
     if (payout.status !== "FAILED" && payout.status !== "REVERSED") {
-
       return;
-
     }
-
-
 
     setBusyPayout(payout.id);
 
-
-
     try {
-
       await api(`/payments/admin/payouts/${payout.id}/retry`, {
-
         method: "POST",
-
       });
-
-
 
       toast.success("Payout retry submitted.");
-
     } catch (error) {
-
       toast.error(
-
         error instanceof Error ? error.message : "Payout retry failed",
-
       );
-
     } finally {
-
       await load(true);
 
       setBusyPayout(null);
-
     }
-
   }
 
-
-
   async function verifyPayout(payout: Payout) {
-
     if (payout.status !== "PROCESSING") return;
-
-
 
     setBusyPayout(payout.id);
 
-
-
     try {
-
       await api(`/payments/admin/payouts/${payout.id}/verify`, {
-
         method: "POST",
-
       });
 
-
-
       toast.success("Payout status verified.");
-
     } catch (error) {
-
       toast.error(
-
         error instanceof Error ? error.message : "Could not verify payout",
-
       );
-
     } finally {
-
       await load(true);
 
       setBusyPayout(null);
-
     }
-
   }
 
-
-
   async function finalizePayout(payout: Payout) {
-
     const otp = (otpValues[payout.id] || "").trim();
 
-
-
     if (!otp) {
-
       toast.error("Enter the OTP to finalize this payout.");
 
       return;
-
     }
 
-
-
     if (otp.length < 4 || otp.length > 12) {
-
       toast.error("The OTP must contain between 4 and 12 characters.");
 
       return;
-
     }
-
-
 
     if (payout.status !== "PROCESSING") return;
 
-
-
     setBusyPayout(payout.id);
 
-
-
     try {
-
       await api(`/payments/admin/payouts/${payout.id}/finalize`, {
-
         method: "POST",
 
         body: JSON.stringify({ otp }),
-
       });
-
-
 
       toast.success("Payout finalization submitted.");
 
-
-
       setOtpValues((current) => {
-
         const updated = { ...current };
 
         delete updated[payout.id];
 
         return updated;
-
       });
-
     } catch (error) {
-
       toast.error(
-
         error instanceof Error ? error.message : "Could not finalize payout",
-
       );
-
     } finally {
-
       await load(true);
 
       setBusyPayout(null);
-
     }
-
   }
 
-
-
   async function createRefund(event: React.FormEvent<HTMLFormElement>) {
-
     event.preventDefault();
-
-
 
     const paymentId = refundPaymentId.trim();
 
@@ -1162,63 +780,38 @@ const [tutorPane, setTutorPane] =
 
     const reason = refundReason.trim();
 
-
-
     if (!paymentId) {
-
       toast.error("Enter the payment ID.");
 
       return;
-
     }
 
-
-
     if (!Number.isSafeInteger(amount) || amount <= 0) {
-
       toast.error("Enter a valid refund amount in kobo.");
 
       return;
-
     }
 
-
-
     if (reason.length < 3 || reason.length > 500) {
-
       toast.error("The reason must contain between 3 and 500 characters.");
 
       return;
-
     }
-
-
 
     setCreatingRefund(true);
 
-
-
     try {
-
       await api(`/payments/admin/${paymentId}/refund`, {
-
         method: "POST",
 
         body: JSON.stringify({
-
           amount_minor: amount,
 
           reason,
-
         }),
-
       });
 
-
-
       toast.success("Refund request submitted.");
-
-
 
       setRefundPaymentId("");
 
@@ -1226,2245 +819,1316 @@ const [tutorPane, setTutorPane] =
 
       setRefundReason("");
 
-
-
       await load(true);
-
     } catch (error) {
-
       toast.error(
-
         error instanceof Error ? error.message : "Could not initiate refund",
-
       );
 
-
-
       await load(true);
-
     } finally {
-
       setCreatingRefund(false);
-
     }
-
   }
 
-
-
   async function verifyRefund(refund: Refund) {
-
     if (refund.status !== "PENDING" && refund.status !== "PROCESSING") {
-
       return;
-
     }
-
-
 
     setBusyRefund(refund.id);
 
-
-
     try {
-
       await api(`/payments/admin/refunds/${refund.id}/verify`, {
-
         method: "POST",
-
       });
 
-
-
       toast.success("Refund status verification submitted.");
-
     } catch (error) {
-
       toast.error(
-
         error instanceof Error ? error.message : "Could not verify refund",
-
       );
-
     } finally {
-
       await load(true);
 
       setBusyRefund(null);
-
     }
-
   }
-
-
 
   if (!isAdmin) {
-
     return (
-
       <AppShell title="Admin" description="Restricted area">
-
         <p className="text-sm text-slate-500">
-
           Your account does not have the administrator role.
-
         </p>
-
       </AppShell>
-
     );
-
   }
-
-
 
   const confirmationTutor = statusConfirmation?.tutor;
 
   const confirmationStatus = statusConfirmation?.status;
 
   const confirmationBusy = confirmationTutor
-
     ? busyTutor === confirmationTutor.user_id
-
     : false;
 
-
-
   return (
-
     <AppShell
-
       title="Admin console"
-
       description="Manage tutors, verification reviews, payouts and payment refunds."
-
     >
-
       {/* Tutor status confirmation modal */}
 
       {statusConfirmation && (
-
         <div
-
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
-
           role="presentation"
-
           onMouseDown={(event) => {
-
             if (event.target === event.currentTarget && !confirmationBusy) {
-
               setStatusConfirmation(null);
-
             }
-
           }}
-
         >
-
           <div
-
             role="dialog"
-
             aria-modal="true"
-
             aria-labelledby="tutor-status-dialog-title"
-
             aria-describedby="tutor-status-dialog-description"
-
             className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
-
           >
-
             <div className="flex items-start justify-between gap-4">
-
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600">
-
                 <AlertTriangle size={22} />
-
               </div>
-
-
 
               <button
-
                 type="button"
-
                 aria-label="Close confirmation"
-
                 disabled={confirmationBusy}
-
                 onClick={() => setStatusConfirmation(null)}
-
                 className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
-
               >
-
                 <X size={19} />
-
               </button>
-
             </div>
-
-
 
             <h2
-
               id="tutor-status-dialog-title"
-
               className="mt-4 text-lg font-bold text-[#102A56]"
-
             >
-
               {confirmationStatus === "SUSPENDED"
-
                 ? "Suspend this tutor?"
-
                 : "Deactivate this tutor?"}
-
             </h2>
 
-
-
             <p
-
               id="tutor-status-dialog-description"
-
               className="mt-2 text-sm leading-6 text-slate-600"
-
             >
-
               You are about to{" "}
-
               {confirmationStatus === "SUSPENDED" ? "suspend" : "deactivate"}{" "}
-
               <strong className="text-slate-800">
-
                 {confirmationTutor?.first_name} {confirmationTutor?.last_name}
-
               </strong>
-
               's account.
-
               {confirmationStatus === "SUSPENDED"
-
                 ? " The account will be marked as suspended."
-
                 : " The account will be marked as inactive."}{" "}
-
               You can reactivate the account later from tutor management.
-
             </p>
-
-
 
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-
               <Button
-
                 type="button"
-
                 variant="outline"
-
                 disabled={confirmationBusy}
-
                 onClick={() => setStatusConfirmation(null)}
-
               >
-
                 Cancel
-
               </Button>
-
-
 
               <Button
-
                 type="button"
-
                 disabled={confirmationBusy}
-
                 onClick={() => void confirmTutorStatusChange()}
-
                 className={
-
                   confirmationStatus === "SUSPENDED"
-
                     ? "bg-amber-600 text-white hover:bg-amber-700"
-
                     : "bg-red-600 text-white hover:bg-red-700"
-
                 }
-
               >
-
                 {confirmationBusy
-
                   ? "Updating..."
-
                   : confirmationStatus === "SUSPENDED"
-
                     ? "Yes, suspend tutor"
-
                     : "Yes, deactivate tutor"}
-
               </Button>
-
             </div>
-
           </div>
-
         </div>
-
       )}
-
-
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-
         <p className="text-sm text-slate-500">
-
-          Administration workspace. Choose a section to manage tutors, verification, or financial operations.
-
+          Administration workspace. Choose a section to manage tutors,
+          verification, or financial operations.
         </p>
-
-
 
         <Button
-
           variant="outline"
-
           size="sm"
-
           disabled={loading || refreshing}
-
           onClick={() => void load(true)}
-
         >
-
           {refreshing ? "Refreshing..." : "Refresh data"}
-
         </Button>
-
       </div>
 
-
-
-      <nav aria-label="Admin sections" className="mb-6 grid grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-3">
-      {[
-        { href: "/admin", label: "Tutor management", key: "tutors" },
-        { href: "/admin/verification", label: "Verification", key: "verification" },
-        { href: "/admin/payments", label: "Payments", key: "payments" },
-      ].map((item) => (
-        <Link key={item.key} href={item.href} aria-current={section === item.key ? "page" : undefined} className={`rounded-xl px-4 py-3 text-center text-sm font-semibold transition-colors ${section === item.key ? "bg-[#102A56] text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-[#102A56]"}`}>
-          {item.label}
-        </Link>
-      ))}
-    </nav>
-
-    {/* Tutor management */}
-
-
-
-{/* Tutor management */}
-
-{section === "tutors" && (
-<section id="tutors" className="scroll-mt-24">
-
-  <Card>
-
-    <CardHeader>
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-
-        <CardTitle>Tutor management</CardTitle>
-
-        <Badge>{tutorTotal} tutors</Badge>
-
-      </div>
-
-    </CardHeader>
-
-
-
-    <CardContent>
-
-      {/* Tutor completion panes */}
-
-      <div className="mb-5 grid gap-2 sm:grid-cols-3">
-
-        <button
-
-          type="button"
-
-          onClick={() => {
-
-            setTutorPage(1);
-
-            setTutorPane("incomplete_profiles");
-
-          }}
-
-          className={`rounded-xl border p-3 text-left transition-colors ${
-
-            tutorPane === "incomplete_profiles"
-
-              ? "border-[#1769D2] bg-[#EDF4FF]"
-
-              : "border-slate-200 bg-white hover:bg-slate-50"
-
-          }`}
-
-        >
-
-          <p className="text-sm font-semibold text-[#102A56]">
-
-            Incomplete profiles
-
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-
-            Step 1 profile details are missing
-
-          </p>
-
-        </button>
-
-
-
-        <button
-
-          type="button"
-
-          onClick={() => {
-
-            setTutorPage(1);
-
-            setTutorPane("incomplete_verification");
-
-          }}
-
-          className={`rounded-xl border p-3 text-left transition-colors ${
-
-            tutorPane === "incomplete_verification"
-
-              ? "border-[#1769D2] bg-[#EDF4FF]"
-
-              : "border-slate-200 bg-white hover:bg-slate-50"
-
-          }`}
-
-        >
-
-          <p className="text-sm font-semibold text-[#102A56]">
-
-            Incomplete verification
-
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-
-            Profile complete, verification outstanding
-
-          </p>
-
-        </button>
-
-
-
-        <button
-
-          type="button"
-
-          onClick={() => {
-
-            setTutorPage(1);
-
-            setTutorPane("pending_verification");
-
-          }}
-
-          className={`rounded-xl border p-3 text-left transition-colors ${
-
-            tutorPane === "pending_verification"
-
-              ? "border-[#1769D2] bg-[#EDF4FF]"
-
-              : "border-slate-200 bg-white hover:bg-slate-50"
-
-          }`}
-
-        >
-
-          <p className="text-sm font-semibold text-[#102A56]">
-
-            Ready for verification
-
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-
-            Complete submissions awaiting review
-
-          </p>
-
-        </button>
-
-      </div>
-
-
-
-      {/* Search and account filters */}
-
-      <div className="mb-5 grid gap-3 md:grid-cols-[1fr_220px_auto]">
-
-        <Field label="Search tutors">
-
-          <input
-
-            value={tutorSearch}
-
-            onChange={(event) => {
-
-              setTutorSearch(event.target.value);
-
-              setTutorPage(1);
-
-            }}
-
-            onKeyDown={(event) => {
-
-              if (event.key === "Enter") {
-
-                void load(true);
-
-              }
-
-            }}
-
-            placeholder="Name, email or phone number"
-
-            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2] focus:ring-2 focus:ring-[#1769D2]/10"
-
-          />
-
-        </Field>
-
-
-
-        <Field label="Account status">
-
-          <select
-
-            value={tutorStatusFilter}
-
-            onChange={(event) => {
-
-              setTutorStatusFilter(event.target.value);
-
-              setTutorPage(1);
-
-            }}
-
-            className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
-
+      <nav
+        aria-label="Admin sections"
+        className="mb-6 grid grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-3"
+      >
+        {[
+          { href: "/admin", label: "Tutor management", key: "tutors" },
+          {
+            href: "/admin/verification",
+            label: "Verification",
+            key: "verification",
+          },
+          { href: "/admin/payments", label: "Payments", key: "payments" },
+        ].map((item) => (
+          <Link
+            key={item.key}
+            href={item.href}
+            aria-current={section === item.key ? "page" : undefined}
+            className={`rounded-xl px-4 py-3 text-center text-sm font-semibold transition-colors ${section === item.key ? "bg-[#102A56] text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-[#102A56]"}`}
           >
-
-            <option value="">All statuses</option>
-
-            <option value="ACTIVE">Active</option>
-
-            <option value="INACTIVE">Inactive</option>
-
-            <option value="SUSPENDED">Suspended</option>
-
-            <option value="PENDING_VERIFICATION">
-
-              Pending verification
-
-            </option>
-
-          </select>
-
-        </Field>
-
-
-
-        <div className="flex items-end">
-
-          <Button
-
-            variant="outline"
-
-            disabled={loading || refreshing}
-
-            onClick={() => void load(true)}
-
-          >
-
-            Search
-
-          </Button>
-
-        </div>
-
-      </div>
-
-
-
-      {/* Current pane description */}
-
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-
-        <div>
-
-          <p className="text-sm font-semibold text-[#102A56]">
-
-            {tutorPane === "incomplete_profiles"
-
-              ? "Profiles requiring completion"
-
-              : tutorPane === "incomplete_verification"
-
-                ? "Verification requirements outstanding"
-
-                : "Tutors ready for administrator review"}
-
-          </p>
-
-
-
-          <p className="mt-1 text-xs text-slate-500">
-
-            {tutorTotal} matching tutor{tutorTotal === 1 ? "" : "s"}
-
-          </p>
-
-        </div>
-
-
-
-        {tutorPane === "pending_verification" && (
-
-          <Button asChild size="sm" variant="outline">
-            <Link href="/admin/verification">Open verification queue</Link>
-          </Button>
-
-        )}
-
-      </div>
-
-
-
-      {loading ? (
-
-        <p className="py-5 text-sm text-slate-500">
-
-          Loading tutors...
-
-        </p>
-
-      ) : tutors.length ? (
-
-        <div className="space-y-4">
-
-          {tutors.map((tutor) => {
-
-            const busy = busyTutor === tutor.user_id;
-
-            const profile = tutor.tutor_profile;
-
-
-
-            return (
-
-              <div
-
-                key={tutor.user_id}
-
-                className="rounded-xl border border-slate-200 p-4"
-
-              >
-
-                {/* Tutor identity */}
-
-                <div className="flex flex-wrap items-start justify-between gap-4">
-
-                  <div className="flex min-w-0 items-start gap-3">
-
-                    {profile?.profile_picture_url ? (
-
-                      <img
-
-                        src={profile.profile_picture_url}
-
-                        alt={`${tutor.first_name} ${tutor.last_name}`}
-
-                        className="h-14 w-14 shrink-0 rounded-xl object-cover"
-
-                      />
-
-                    ) : (
-
-                      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#EDF4FF] text-lg font-bold text-[#1769D2]">
-
-                        {tutor.first_name.charAt(0)}
-
-                        {tutor.last_name.charAt(0)}
-
-                      </div>
-
-                    )}
-
-
-
-                    <div className="min-w-0">
-
-                      <p className="font-semibold text-[#102A56]">
-
-                        {tutor.first_name} {tutor.last_name}
-
-                      </p>
-
-
-
-                      <p className="mt-1 break-all text-sm text-slate-500">
-
-                        {tutor.email}
-
-                      </p>
-
-
-
-                      <p className="mt-1 text-xs text-slate-500">
-
-                        {tutor.phone_number || "No phone number"}
-
-                      </p>
-
-
-
-                      <p className="mt-1 text-xs text-slate-400">
-
-                        Joined {formatDate(tutor.created_at)}
-
-                      </p>
-
-                    </div>
-
-                  </div>
-
-
-
-                  <div className="flex flex-wrap gap-2">
-
-                    <Badge className={statusClass(tutor.status)}>
-
-                      {tutor.status.replaceAll("_", " ")}
-
-                    </Badge>
-
-
-
-                    <Badge
-
-                      className={statusClass(
-
-                        tutor.verification_status || "NOT_SUBMITTED",
-
-                      )}
-
-                    >
-
-                      {(tutor.verification_status || "NOT SUBMITTED")
-
-                        .replaceAll("_", " ")}
-
-                    </Badge>
-
-                  </div>
-
-                </div>
-
-
-
-                {/* Profile information */}
-
-                <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-
-                      Monthly tutoring fee
-
-                    </p>
-
-                    <p className="mt-1 font-medium text-slate-700">
-
-                      {formatRate(profile?.monthly_fee ?? null)}
-
-                    </p>
-
-                  </div>
-
-
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-
-                      Experience
-
-                    </p>
-
-                    <p className="mt-1 font-medium text-slate-700">
-
-                      {profile
-
-                        ? `${profile.years_of_experience} years`
-
-                        : "Profile not created"}
-
-                    </p>
-
-                  </div>
-
-
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-
-                      Teaching modes
-
-                    </p>
-
-                    <p className="mt-1 font-medium text-slate-700">
-
-                      {formatList(profile?.tutoring_modes)}
-
-                    </p>
-
-                  </div>
-
-
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-
-                      Teaching languages
-
-                    </p>
-
-                    <p className="mt-1 font-medium text-slate-700">
-
-                      {formatList(profile?.teaching_languages)}
-
-                    </p>
-
-                  </div>
-
-
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-
-                      Learner age groups
-
-                    </p>
-
-                    <p className="mt-1 font-medium text-slate-700">
-
-                      {formatList(profile?.learner_age_groups)}
-
-                    </p>
-
-                  </div>
-
-
-
-                  <div>
-
-                    <p className="text-xs text-slate-400">
-
-                      Qualifications
-
-                    </p>
-
-                    <p className="mt-1 line-clamp-2 font-medium text-slate-700">
-
-                      {profile?.qualifications || "Not provided"}
-
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-
-                {/* Profile completion */}
-
-                {tutor.missing_profile_fields.length > 0 ? (
-
-                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
-
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-
-                      <p className="text-sm font-semibold text-amber-800">
-
-                        Profile incomplete
-
-                      </p>
-
-                      <Badge className="border-amber-200 bg-white text-amber-700">
-
-                        {tutor.missing_profile_fields.length} outstanding
-
-                      </Badge>
-
-                    </div>
-
-
-
-                    <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-800">
-
-                      {tutor.missing_profile_fields.map((field) => (
-
-                        <li key={field}>
-
-                          {formatRequirement(field)}
-
-                        </li>
-
-                      ))}
-
-                    </ul>
-
-                  </div>
-
-                ) : (
-
-                  <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3">
-
-                    <p className="text-sm font-semibold text-green-800">
-
-                      Profile requirements complete
-
-                    </p>
-
-                  </div>
-
-                )}
-
-
-
-                {/* Verification completion */}
-
-                {tutor.profile_completed &&
-
-                  tutor.missing_verification_fields.length > 0 && (
-
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-
-                        <p className="text-sm font-semibold text-slate-700">
-
-                          Verification requirements outstanding
-
-                        </p>
-
-
-
-                        <Badge className="border-slate-200 bg-white text-slate-600">
-
-                          {tutor.missing_verification_fields.length} outstanding
-
-                        </Badge>
-
-                      </div>
-
-
-
-                      <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-slate-600">
-
-                        {tutor.missing_verification_fields.map((field) => (
-
-                          <li key={field}>
-
-                            {formatRequirement(field)}
-
-                          </li>
-
-                        ))}
-
-                      </ul>
-
-                    </div>
-
-                  )}
-
-
-
-                {tutor.ready_for_verification && (
-
-                  <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
-
-                    <p className="text-sm font-semibold text-green-800">
-
-                      Ready for administrator review
-
-                    </p>
-
-
-
-                    <p className="mt-1 text-xs text-green-700">
-
-                      The tutor has completed the profile and verification
-
-                      submission requirements.
-
-                    </p>
-
-
-
-
-
-                  </div>
-
-                )}
-
-
-
-                {/* Existing tutor actions */}
-
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-
-                  {tutor.status !== "ACTIVE" && (
-
-                    <Button
-
-                      size="sm"
-
-                      disabled={busy}
-
-                      onClick={() =>
-
-                        void updateTutorStatus(tutor, "ACTIVE")
-
-                      }
-
-                    >
-
-                      {busy ? "Updating..." : "Activate"}
-
-                    </Button>
-
-                  )}
-
-
-
-                  {tutor.status === "ACTIVE" && (
-
-                    <Button
-
-                      size="sm"
-
-                      variant="outline"
-
-                      disabled={busy}
-
-                      onClick={() =>
-
-                        requestTutorStatusChange(tutor, "SUSPENDED")
-
-                      }
-
-                    >
-
-                      Suspend
-
-                    </Button>
-
-                  )}
-
-
-
-                  {tutor.status !== "INACTIVE" && (
-
-                    <Button
-
-                      size="sm"
-
-                      variant="outline"
-
-                      disabled={busy}
-
-                      onClick={() =>
-
-                        requestTutorStatusChange(tutor, "INACTIVE")
-
-                      }
-
-                    >
-
-                      Deactivate
-
-                    </Button>
-
-                  )}
-
-                </div>
-
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+
+      {/* Tutor management */}
+
+      {/* Tutor management */}
+
+      {section === "tutors" && (
+        <section id="tutors" className="scroll-mt-24">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Tutor management</CardTitle>
+
+                <Badge>{tutorTotal} tutors</Badge>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {/* Tutor completion panes */}
+
+              <div className="mb-5 grid gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTutorPage(1);
+
+                    setTutorPane("incomplete_profiles");
+                  }}
+                  className={`rounded-xl border p-3 text-left transition-colors ${
+                    tutorPane === "incomplete_profiles"
+                      ? "border-[#1769D2] bg-[#EDF4FF]"
+                      : "border-slate-200 bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-[#102A56]">
+                    Incomplete profiles
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Step 1 profile details are missing
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTutorPage(1);
+
+                    setTutorPane("incomplete_verification");
+                  }}
+                  className={`rounded-xl border p-3 text-left transition-colors ${
+                    tutorPane === "incomplete_verification"
+                      ? "border-[#1769D2] bg-[#EDF4FF]"
+                      : "border-slate-200 bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-[#102A56]">
+                    Incomplete verification
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Profile complete, verification outstanding
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTutorPage(1);
+
+                    setTutorPane("pending_verification");
+                  }}
+                  className={`rounded-xl border p-3 text-left transition-colors ${
+                    tutorPane === "pending_verification"
+                      ? "border-[#1769D2] bg-[#EDF4FF]"
+                      : "border-slate-200 bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <p className="text-sm font-semibold text-[#102A56]">
+                    Ready for verification
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Complete submissions awaiting review
+                  </p>
+                </button>
               </div>
 
-            );
+              {/* Search and account filters */}
 
-          })}
+              <div className="mb-5 grid gap-3 md:grid-cols-[1fr_220px_auto]">
+                <Field label="Search tutors">
+                  <input
+                    value={tutorSearch}
+                    onChange={(event) => {
+                      setTutorSearch(event.target.value);
 
+                      setTutorPage(1);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        void load(true);
+                      }
+                    }}
+                    placeholder="Name, email or phone number"
+                    className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2] focus:ring-2 focus:ring-[#1769D2]/10"
+                  />
+                </Field>
 
+                <Field label="Account status">
+                  <select
+                    value={tutorStatusFilter}
+                    onChange={(event) => {
+                      setTutorStatusFilter(event.target.value);
 
-          {/* Pagination */}
+                      setTutorPage(1);
+                    }}
+                    className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
+                  >
+                    <option value="">All statuses</option>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <option value="ACTIVE">Active</option>
 
-            <p className="text-xs text-slate-500">
+                    <option value="INACTIVE">Inactive</option>
 
-              Page {tutorPage} of {tutorTotalPages} · {tutorTotal} tutors
+                    <option value="SUSPENDED">Suspended</option>
 
-            </p>
+                    <option value="PENDING_VERIFICATION">
+                      Pending verification
+                    </option>
+                  </select>
+                </Field>
 
+                <div className="flex items-end">
+                  <Button
+                    variant="outline"
+                    disabled={loading || refreshing}
+                    onClick={() => void load(true)}
+                  >
+                    Search
+                  </Button>
+                </div>
+              </div>
 
+              {/* Current pane description */}
 
-            <div className="flex gap-2">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-[#102A56]">
+                    {tutorPane === "incomplete_profiles"
+                      ? "Profiles requiring completion"
+                      : tutorPane === "incomplete_verification"
+                        ? "Verification requirements outstanding"
+                        : "Tutors ready for administrator review"}
+                  </p>
 
-              <Button
+                  <p className="mt-1 text-xs text-slate-500">
+                    {tutorTotal} matching tutor{tutorTotal === 1 ? "" : "s"}
+                  </p>
+                </div>
 
-                size="sm"
+                {tutorPane === "pending_verification" && (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/admin/verification">
+                      Open verification queue
+                    </Link>
+                  </Button>
+                )}
+              </div>
 
-                variant="outline"
+              {loading ? (
+                <p className="py-5 text-sm text-slate-500">Loading tutors...</p>
+              ) : tutors.length ? (
+                <div className="space-y-4">
+                  {tutors.map((tutor) => {
+                    const busy = busyTutor === tutor.user_id;
 
-                disabled={tutorPage <= 1 || loading}
+                    const profile = tutor.tutor_profile;
 
-                onClick={() => setTutorPage((page) => page - 1)}
+                    return (
+                      <div
+                        key={tutor.user_id}
+                        className="rounded-xl border border-slate-200 p-4"
+                      >
+                        {/* Tutor identity */}
 
-              >
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="flex min-w-0 items-start gap-3">
+                            {profile?.profile_picture_url ? (
+                              <img
+                                src={profile.profile_picture_url}
+                                alt={`${tutor.first_name} ${tutor.last_name}`}
+                                className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                              />
+                            ) : (
+                              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-[#EDF4FF] text-lg font-bold text-[#1769D2]">
+                                {tutor.first_name.charAt(0)}
 
-                Previous
+                                {tutor.last_name.charAt(0)}
+                              </div>
+                            )}
 
-              </Button>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-[#102A56]">
+                                {tutor.first_name} {tutor.last_name}
+                              </p>
 
+                              <p className="mt-1 break-all text-sm text-slate-500">
+                                {tutor.email}
+                              </p>
 
+                              <p className="mt-1 text-xs text-slate-500">
+                                {tutor.phone_number || "No phone number"}
+                              </p>
 
-              <Button
+                              <p className="mt-1 text-xs text-slate-400">
+                                Joined {formatDate(tutor.created_at)}
+                              </p>
+                            </div>
+                          </div>
 
-                size="sm"
+                          <div className="flex flex-wrap gap-2">
+                            <Badge className={statusClass(tutor.status)}>
+                              {tutor.status.replaceAll("_", " ")}
+                            </Badge>
 
-                variant="outline"
+                            <Badge
+                              className={statusClass(
+                                tutor.verification_status || "NOT_SUBMITTED",
+                              )}
+                            >
+                              {(
+                                tutor.verification_status || "NOT SUBMITTED"
+                              ).replaceAll("_", " ")}
+                            </Badge>
+                          </div>
+                        </div>
 
-                disabled={tutorPage >= tutorTotalPages || loading}
+                        {/* Profile information */}
 
-                onClick={() => setTutorPage((page) => page + 1)}
+                        <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                          <div>
+                            <p className="text-xs text-slate-400">
+                              Monthly tutoring fee
+                            </p>
 
-              >
+                            <p className="mt-1 font-medium text-slate-700">
+                              {formatRate(profile?.monthly_fee ?? null)}
+                            </p>
+                          </div>
 
-                Next
+                          <div>
+                            <p className="text-xs text-slate-400">Experience</p>
 
-              </Button>
+                            <p className="mt-1 font-medium text-slate-700">
+                              {profile
+                                ? `${profile.years_of_experience} years`
+                                : "Profile not created"}
+                            </p>
+                          </div>
 
-            </div>
+                          <div>
+                            <p className="text-xs text-slate-400">
+                              Teaching modes
+                            </p>
 
-          </div>
+                            <p className="mt-1 font-medium text-slate-700">
+                              {formatList(profile?.tutoring_modes)}
+                            </p>
+                          </div>
 
-        </div>
+                          <div>
+                            <p className="text-xs text-slate-400">
+                              Teaching languages
+                            </p>
 
-      ) : (
+                            <p className="mt-1 font-medium text-slate-700">
+                              {formatList(profile?.teaching_languages)}
+                            </p>
+                          </div>
 
-        <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
+                          <div>
+                            <p className="text-xs text-slate-400">
+                              Learner age groups
+                            </p>
 
-          <p className="font-medium text-slate-700">
+                            <p className="mt-1 font-medium text-slate-700">
+                              {formatList(profile?.learner_age_groups)}
+                            </p>
+                          </div>
 
-            {tutorPane === "incomplete_profiles"
+                          <div>
+                            <p className="text-xs text-slate-400">
+                              Qualifications
+                            </p>
 
-              ? "No incomplete tutor profiles"
+                            <p className="mt-1 line-clamp-2 font-medium text-slate-700">
+                              {profile?.qualifications || "Not provided"}
+                            </p>
+                          </div>
+                        </div>
 
-              : tutorPane === "incomplete_verification"
+                        {/* Profile completion */}
 
-                ? "No outstanding verification requirements"
+                        {tutor.missing_profile_fields.length > 0 ? (
+                          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-amber-800">
+                                Profile incomplete
+                              </p>
 
-                : "No tutors awaiting verification review"}
+                              <Badge className="border-amber-200 bg-white text-amber-700">
+                                {tutor.missing_profile_fields.length}{" "}
+                                outstanding
+                              </Badge>
+                            </div>
 
-          </p>
+                            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-800">
+                              {tutor.missing_profile_fields.map((field) => (
+                                <li key={field}>{formatRequirement(field)}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3">
+                            <p className="text-sm font-semibold text-green-800">
+                              Profile requirements complete
+                            </p>
+                          </div>
+                        )}
 
+                        {/* Verification completion */}
 
+                        {tutor.profile_completed &&
+                          tutor.missing_verification_fields.length > 0 && (
+                            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-slate-700">
+                                  Verification requirements outstanding
+                                </p>
 
-          <p className="mt-1 text-sm text-slate-500">
+                                <Badge className="border-slate-200 bg-white text-slate-600">
+                                  {tutor.missing_verification_fields.length}{" "}
+                                  outstanding
+                                </Badge>
+                              </div>
 
-            There are no tutors matching this pane and the selected filters.
+                              <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-slate-600">
+                                {tutor.missing_verification_fields.map(
+                                  (field) => (
+                                    <li key={field}>
+                                      {formatRequirement(field)}
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            </div>
+                          )}
 
-          </p>
+                        {tutor.ready_for_verification && (
+                          <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+                            <p className="text-sm font-semibold text-green-800">
+                              Ready for administrator review
+                            </p>
 
-        </div>
+                            <p className="mt-1 text-xs text-green-700">
+                              The tutor has completed the profile and
+                              verification submission requirements.
+                            </p>
+                          </div>
+                        )}
 
+                        {/* Existing tutor actions */}
+
+                        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+                          {tutor.status !== "ACTIVE" && (
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                void updateTutorStatus(tutor, "ACTIVE")
+                              }
+                            >
+                              {busy ? "Updating..." : "Activate"}
+                            </Button>
+                          )}
+
+                          {tutor.status === "ACTIVE" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                requestTutorStatusChange(tutor, "SUSPENDED")
+                              }
+                            >
+                              Suspend
+                            </Button>
+                          )}
+
+                          {tutor.status !== "INACTIVE" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                requestTutorStatusChange(tutor, "INACTIVE")
+                              }
+                            >
+                              Deactivate
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Pagination */}
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <p className="text-xs text-slate-500">
+                      Page {tutorPage} of {tutorTotalPages} · {tutorTotal}{" "}
+                      tutors
+                    </p>
+
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={tutorPage <= 1 || loading}
+                        onClick={() => setTutorPage((page) => page - 1)}
+                      >
+                        Previous
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={tutorPage >= tutorTotalPages || loading}
+                        onClick={() => setTutorPage((page) => page + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
+                  <p className="font-medium text-slate-700">
+                    {tutorPane === "incomplete_profiles"
+                      ? "No incomplete tutor profiles"
+                      : tutorPane === "incomplete_verification"
+                        ? "No outstanding verification requirements"
+                        : "No tutors awaiting verification review"}
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    There are no tutors matching this pane and the selected
+                    filters.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
       )}
-
-    </CardContent>
-
-  </Card>
-
-</section>
-)}
 
       {/* Verification queue */}
 
       {section === "verification" && (
-<section id="verification" className="mt-6 scroll-mt-24">
+        <section id="verification" className="mt-6 scroll-mt-24">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Pending tutor verification</CardTitle>
 
-        <Card>
+                <Badge>{checks.length} pending</Badge>
+              </div>
+            </CardHeader>
 
-          <CardHeader>
+            <CardContent>
+              {loading ? (
+                <p className="py-5 text-sm text-slate-500">
+                  Loading verification records...
+                </p>
+              ) : checks.length ? (
+                checks.map((verification) => {
+                  const isBusy = busyVerification === verification.id;
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
+                  return (
+                    <div
+                      key={verification.id}
+                      className="border-b border-slate-100 py-5 last:border-0"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          {(() => {
+                            const tutor = allTutors.find(
+                              (item) =>
+                                item.user_id === verification.tutor_user_id,
+                            );
+                            const fullName = tutor
+                              ? `${tutor.first_name} ${tutor.last_name}`
+                              : "Tutor details unavailable";
+                            const picture =
+                              tutor?.tutor_profile?.profile_picture_url;
 
-              <CardTitle>Pending tutor verification</CardTitle>
-
-              <Badge>{checks.length} pending</Badge>
-
-            </div>
-
-          </CardHeader>
-
-
-
-          <CardContent>
-
-            {loading ? (
-
-              <p className="py-5 text-sm text-slate-500">
-
-                Loading verification records...
-
-              </p>
-
-            ) : checks.length ? (
-
-              checks.map((verification) => {
-
-                const isBusy = busyVerification === verification.id;
-
-
-
-                return (
-
-                  <div
-
-                    key={verification.id}
-
-                    className="border-b border-slate-100 py-5 last:border-0"
-
-                  >
-
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-
-                      <div className="flex min-w-0 items-center gap-3">
-                        {(() => {
-                          const tutor = allTutors.find(
-                            (item) => item.user_id === verification.tutor_user_id,
-                          );
-                          const fullName = tutor
-                            ? `${tutor.first_name} ${tutor.last_name}`
-                            : "Tutor details unavailable";
-                          const picture = tutor?.tutor_profile?.profile_picture_url;
-
-                          return (
-                            <>
-                              {picture ? (
-                                <img
-                                  src={picture}
-                                  alt={fullName}
-                                  className="h-12 w-12 shrink-0 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#EDF4FF] text-sm font-bold text-[#1769D2]">
-                                  {tutor
-                                    ? `${tutor.first_name.charAt(0)}${tutor.last_name.charAt(0)}`
-                                    : "TU"}
-                                </div>
-                              )}
-                              <div className="min-w-0">
-                                <p className="font-semibold text-[#102A56]">{fullName}</p>
-                                {tutor?.email && (
-                                  <p className="mt-1 break-all text-xs text-slate-500">{tutor.email}</p>
+                            return (
+                              <>
+                                {picture ? (
+                                  <img
+                                    src={picture}
+                                    alt={fullName}
+                                    className="h-12 w-12 shrink-0 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#EDF4FF] text-sm font-bold text-[#1769D2]">
+                                    {tutor
+                                      ? `${tutor.first_name.charAt(0)}${tutor.last_name.charAt(0)}`
+                                      : "TU"}
+                                  </div>
                                 )}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-
-                      <div className="min-w-0">
-
-                        <p className="mt-1 text-xs text-slate-500">
-
-                          {verification.identity_document_type ||
-
-                            "Document type unavailable"}
-
-                          {" · "}
-
-                          {formatDate(verification.submitted_at)}
-
-                        </p>
-
-                        <p className="mt-1 break-all text-xs text-slate-500">
-
-                          Verification ID: {verification.id}
-
-                        </p>
-
-                      </div>
-
-                      <Badge className={statusClass(verification.status)}>
-
-                        {verification.status}
-
-                      </Badge>
-
-                    </div>
-
-
-
-                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="mb-2">
-                        <p className="text-sm font-semibold text-[#102A56]">Tutor introduction video</p>
-                        <p className="text-xs text-slate-500">Review the tutor’s introduction before making a verification decision.</p>
-                      </div>
-                      {verification.introduction_video_url ? (
-                        <video
-                          key={verification.introduction_video_url}
-                          src={verification.introduction_video_url}
-                          controls
-                          playsInline
-                          preload="metadata"
-                          className="max-h-[420px] w-full rounded-lg bg-black"
-                        >
-                          Your browser does not support video playback.
-                        </video>
-                      ) : (
-                        <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-sm text-slate-500">
-                          Introduction video is not included in the verification response.
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-4">
-
-                      <Button
-
-                        size="sm"
-
-                        variant="outline"
-
-                        disabled={openingDocument === verification.id}
-
-                        onClick={() =>
-
-                          void openIdentityDocument(verification.id)
-
-                        }
-
-                      >
-
-                        {openingDocument === verification.id
-
-                          ? "Opening document..."
-
-                          : "View identity document"}
-
-                      </Button>
-
-                    </div>
-
-
-
-                    <div className="mt-3">
-
-                      <Button
-
-                        size="sm"
-
-                        variant="outline"
-
-                        disabled={loadingReferees === verification.id}
-
-                        onClick={() => void loadReferees(verification.id)}
-
-                      >
-
-                        {loadingReferees === verification.id ? "Loading referees…" : "View referee consent records"}
-
-                      </Button>
-
-                      {refereesByVerification[verification.id] && (
-
-                        <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
-
-                          {refereesByVerification[verification.id].map((referee) => (
-
-                            <div key={referee.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-
-                              <div><p className="font-medium text-slate-800">{referee.full_name}</p><p className="text-xs text-slate-500">{referee.email} · {referee.job_title} · {referee.relationship_to_tutor}</p>{referee.responded_at && <p className="mt-1 text-[11px] text-slate-400">Responded {new Date(referee.responded_at).toLocaleString()}</p>}</div>
-
-                              <Badge className={referee.status === "CONSENTED" ? "bg-emerald-50 text-emerald-700" : referee.status === "DECLINED" || referee.status === "EXPIRED" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}>{referee.status}</Badge>
-
-                            </div>
-
-                          ))}
-
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-[#102A56]">
+                                    {fullName}
+                                  </p>
+                                  {tutor?.email && (
+                                    <p className="mt-1 break-all text-xs text-slate-500">
+                                      {tutor.email}
+                                    </p>
+                                  )}
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
 
-                      )}
+                        <div className="min-w-0">
+                          <p className="mt-1 text-xs text-slate-500">
+                            {verification.identity_document_type ||
+                              "Document type unavailable"}
 
-                    </div>
+                            {" · "}
 
+                            {formatDate(verification.submitted_at)}
+                          </p>
 
+                          <p className="mt-1 break-all text-xs text-slate-500">
+                            Verification ID: {verification.id}
+                          </p>
+                        </div>
 
-                    {verification.review_notes && (
-
-                      <div className="mt-3 rounded-lg bg-slate-50 p-3">
-
-                        <p className="text-xs font-semibold text-slate-600">
-
-                          Previous review notes
-
-                        </p>
-
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-
-                          {verification.review_notes}
-
-                        </p>
-
+                        <Badge className={statusClass(verification.status)}>
+                          {verification.status}
+                        </Badge>
                       </div>
 
-                    )}
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="mb-2">
+                          <p className="text-sm font-semibold text-[#102A56]">
+                            Tutor introduction video
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Review the tutor’s introduction before making a
+                            verification decision.
+                          </p>
+                        </div>
+                        {verification?.introduction_video_url ? (
+                          <video
+                            key={verification.introduction_video_url}
+                            src={verification.introduction_video_url}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className="max-h-[420px] w-full rounded-lg bg-black"
+                          >
+                            Your browser does not support video playback.
+                          </video>
+                        ) : (
+                          <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-sm text-slate-500">
+                            Introduction video is not included in the
+                            verification response.
+                          </p>
+                        )}
+                      </div>
 
-
-
-                    <div className="mt-4">
-
-                      <Field label="Review notes">
-
-                        <Textarea
-
-                          rows={3}
-
-                          maxLength={3000}
-
-                          placeholder="Add feedback or explain the reason for your decision..."
-
-                          value={notes[verification.id] || ""}
-
-                          onChange={(event) =>
-
-                            setNotes((current) => ({
-
-                              ...current,
-
-                              [verification.id]: event.target.value,
-
-                            }))
-
+                      <div className="mt-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={openingDocument === verification.id}
+                          onClick={() =>
+                            void openIdentityDocument(verification.id)
                           }
+                        >
+                          {openingDocument === verification.id
+                            ? "Opening document..."
+                            : "View identity document"}
+                        </Button>
+                      </div>
 
-                        />
+                      <div className="mt-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={loadingReferees === verification.id}
+                          onClick={() => void loadReferees(verification.id)}
+                        >
+                          {loadingReferees === verification.id
+                            ? "Loading referees…"
+                            : "View referee consent records"}
+                        </Button>
 
-                      </Field>
+                        {refereesByVerification[verification.id] && (
+                          <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+                            {refereesByVerification[verification.id].map(
+                              (referee) => (
+                                <div
+                                  key={referee.id}
+                                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                                >
+                                  <div>
+                                    <p className="font-medium text-slate-800">
+                                      {referee.full_name}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                      {referee.email} · {referee.job_title} ·{" "}
+                                      {referee.relationship_to_tutor}
+                                    </p>
+                                    {referee.responded_at && (
+                                      <p className="mt-1 text-[11px] text-slate-400">
+                                        Responded{" "}
+                                        {new Date(
+                                          referee.responded_at,
+                                        ).toLocaleString()}
+                                      </p>
+                                    )}
+                                  </div>
 
-                      <p className="mt-1 text-right text-xs text-slate-400">
+                                  <Badge
+                                    className={
+                                      referee.status === "CONSENTED"
+                                        ? "bg-emerald-50 text-emerald-700"
+                                        : referee.status === "DECLINED" ||
+                                            referee.status === "EXPIRED"
+                                          ? "bg-rose-50 text-rose-700"
+                                          : "bg-amber-50 text-amber-700"
+                                    }
+                                  >
+                                    {referee.status}
+                                  </Badge>
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        )}
+                      </div>
 
-                        {(notes[verification.id] || "").length}/3000
+                      {verification.review_notes && (
+                        <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                          <p className="text-xs font-semibold text-slate-600">
+                            Previous review notes
+                          </p>
 
-                      </p>
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
+                            {verification.review_notes}
+                          </p>
+                        </div>
+                      )}
 
+                      <div className="mt-4">
+                        <Field label="Review notes">
+                          <Textarea
+                            rows={3}
+                            maxLength={3000}
+                            placeholder="Add feedback or explain the reason for your decision..."
+                            value={notes[verification.id] || ""}
+                            onChange={(event) =>
+                              setNotes((current) => ({
+                                ...current,
+
+                                [verification.id]: event.target.value,
+                              }))
+                            }
+                          />
+                        </Field>
+
+                        <p className="mt-1 text-right text-xs text-slate-400">
+                          {(notes[verification.id] || "").length}/3000
+                        </p>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          disabled={isBusy}
+                          onClick={() =>
+                            void review(verification.id, "APPROVED")
+                          }
+                        >
+                          {isBusy ? "Processing..." : "Approve"}
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isBusy}
+                          onClick={() =>
+                            void review(verification.id, "CHANGES_REQUESTED")
+                          }
+                        >
+                          Request changes
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isBusy}
+                          onClick={() =>
+                            void review(verification.id, "REJECTED")
+                          }
+                        >
+                          Reject
+                        </Button>
+                      </div>
                     </div>
-
-
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-
-                      <Button
-
-                        size="sm"
-
-                        disabled={isBusy}
-
-                        onClick={() => void review(verification.id, "APPROVED")}
-
-                      >
-
-                        {isBusy ? "Processing..." : "Approve"}
-
-                      </Button>
-
-                      <Button
-
-                        size="sm"
-
-                        variant="outline"
-
-                        disabled={isBusy}
-
-                        onClick={() =>
-
-                          void review(verification.id, "CHANGES_REQUESTED")
-
-                        }
-
-                      >
-
-                        Request changes
-
-                      </Button>
-
-                      <Button
-
-                        size="sm"
-
-                        variant="outline"
-
-                        disabled={isBusy}
-
-                        onClick={() => void review(verification.id, "REJECTED")}
-
-                      >
-
-                        Reject
-
-                      </Button>
-
-                    </div>
-
-                  </div>
-
-                );
-
-              })
-
-            ) : (
-
-              <p className="py-5 text-sm text-slate-500">
-
-                No pending verification records.
-
-              </p>
-
-            )}
-
-          </CardContent>
-
-        </Card>
-
-      </section>
-)}
-
-
+                  );
+                })
+              ) : (
+                <p className="py-5 text-sm text-slate-500">
+                  No pending verification records.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Payouts */}
 
       {section === "payments" && (
-<section id="payouts" className="mt-6 scroll-mt-24">
+        <section id="payouts" className="mt-6 scroll-mt-24">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Tutor payouts</CardTitle>
 
-        <Card>
+                <Badge>{payouts.length} records</Badge>
+              </div>
+            </CardHeader>
 
-          <CardHeader>
+            <CardContent>
+              {loading ? (
+                <p className="py-5 text-sm text-slate-500">
+                  Loading payout records...
+                </p>
+              ) : payouts.length ? (
+                payouts.map((payout) => {
+                  const isBusy = busyPayout === payout.id;
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-
-              <CardTitle>Tutor payouts</CardTitle>
-
-              <Badge>{payouts.length} records</Badge>
-
-            </div>
-
-          </CardHeader>
-
-
-
-          <CardContent>
-
-            {loading ? (
-
-              <p className="py-5 text-sm text-slate-500">
-
-                Loading payout records...
-
-              </p>
-
-            ) : payouts.length ? (
-
-              payouts.map((payout) => {
-
-                const isBusy = busyPayout === payout.id;
-
-
-
-                return (
-
-                  <div
-
-                    key={payout.id}
-
-                    className="border-b border-slate-100 py-5 last:border-0"
-
-                  >
-
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-
-                      <div className="min-w-0">
-
-                        <p className="text-lg font-semibold text-[#102A56]">
-
-                          {money(payout.amount_minor, payout.currency)}
-
-                        </p>
-
-                        <p className="mt-1 break-all text-xs text-slate-500">
-
-                          Provider reference:{" "}
-
-                          {payout.provider_reference || "Unavailable"}
-
-                        </p>
-
-                        <p className="mt-1 break-all text-xs text-slate-500">
-
-                          Payout ID: {payout.id}
-
-                        </p>
-
-                        <p className="mt-1 break-all text-xs text-slate-500">
-
-                          Payment ID: {payout.payment_id}
-
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-500">
-
-                          Created: {formatDate(payout.created_at)}
-
-                        </p>
-
-                        {payout.paid_at && (
-
-                          <p className="mt-1 text-xs text-slate-500">
-
-                            Paid: {formatDate(payout.paid_at)}
-
+                  return (
+                    <div
+                      key={payout.id}
+                      className="border-b border-slate-100 py-5 last:border-0"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-lg font-semibold text-[#102A56]">
+                            {money(payout.amount_minor, payout.currency)}
                           </p>
 
-                        )}
-
-                      </div>
-
-                      <Badge className={statusClass(payout.status)}>
-
-                        {payout.status}
-
-                      </Badge>
-
-                    </div>
-
-
-
-                    {payout.failure_reason && (
-
-                      <div className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3">
-
-                        <p className="text-xs font-semibold text-red-700">
-
-                          Failure reason
-
-                        </p>
-
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-red-700">
-
-                          {payout.failure_reason}
-
-                        </p>
-
-                      </div>
-
-                    )}
-
-
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-
-                      {payout.status === "REQUESTED" && (
-
-                        <Button
-
-                          size="sm"
-
-                          disabled={isBusy}
-
-                          onClick={() => void processPayout(payout)}
-
-                        >
-
-                          {isBusy ? "Processing..." : "Process payout"}
-
-                        </Button>
-
-                      )}
-
-
-
-                      {payout.status === "PROCESSING" && (
-
-                        <Button
-
-                          size="sm"
-
-                          variant="outline"
-
-                          disabled={isBusy}
-
-                          onClick={() => void verifyPayout(payout)}
-
-                        >
-
-                          {isBusy ? "Verifying..." : "Verify payout"}
-
-                        </Button>
-
-                      )}
-
-
-
-                      {(payout.status === "FAILED" ||
-
-                        payout.status === "REVERSED") && (
-
-                        <Button
-
-                          size="sm"
-
-                          variant="outline"
-
-                          disabled={isBusy}
-
-                          onClick={() => void retryPayout(payout)}
-
-                        >
-
-                          {isBusy ? "Retrying..." : "Retry payout"}
-
-                        </Button>
-
-                      )}
-
-
-
-                      {payout.status === "PAID" && (
-
-                        <span className="text-sm font-medium text-green-700">
-
-                          Payout completed
-
-                        </span>
-
-                      )}
-
-                    </div>
-
-
-
-                    {payout.status === "PROCESSING" && (
-
-                      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-
-                        <p className="text-sm font-semibold text-[#102A56]">
-
-                          Finalize payout
-
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-500">
-
-                          If this transfer is awaiting OTP confirmation, enter
-
-                          the OTP to finalize it. You can also verify its
-
-                          provider status before taking further action.
-
-                        </p>
-
-
-
-                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-
-                          <div className="flex-1">
-
-                            <Field label="Transfer OTP">
-
-                              <input
-
-                                type="text"
-
-                                inputMode="numeric"
-
-                                autoComplete="one-time-code"
-
-                                maxLength={12}
-
-                                placeholder="Enter OTP"
-
-                                value={otpValues[payout.id] || ""}
-
-                                onChange={(event) =>
-
-                                  setOtpValues((current) => ({
-
-                                    ...current,
-
-                                    [payout.id]: event.target.value,
-
-                                  }))
-
-                                }
-
-                                className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
-
-                              />
-
-                            </Field>
-
-                          </div>
-
-                          <Button
-
-                            size="sm"
-
-                            disabled={
-
-                              isBusy || !(otpValues[payout.id] || "").trim()
-
-                            }
-
-                            onClick={() => void finalizePayout(payout)}
-
-                          >
-
-                            {isBusy ? "Finalizing..." : "Finalize payout"}
-
-                          </Button>
-
+                          <p className="mt-1 break-all text-xs text-slate-500">
+                            Provider reference:{" "}
+                            {payout.provider_reference || "Unavailable"}
+                          </p>
+
+                          <p className="mt-1 break-all text-xs text-slate-500">
+                            Payout ID: {payout.id}
+                          </p>
+
+                          <p className="mt-1 break-all text-xs text-slate-500">
+                            Payment ID: {payout.payment_id}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            Created: {formatDate(payout.created_at)}
+                          </p>
+
+                          {payout.paid_at && (
+                            <p className="mt-1 text-xs text-slate-500">
+                              Paid: {formatDate(payout.paid_at)}
+                            </p>
+                          )}
                         </div>
 
+                        <Badge className={statusClass(payout.status)}>
+                          {payout.status}
+                        </Badge>
                       </div>
 
-                    )}
+                      {payout.failure_reason && (
+                        <div className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3">
+                          <p className="text-xs font-semibold text-red-700">
+                            Failure reason
+                          </p>
 
-                  </div>
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-red-700">
+                            {payout.failure_reason}
+                          </p>
+                        </div>
+                      )}
 
-                );
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {payout.status === "REQUESTED" && (
+                          <Button
+                            size="sm"
+                            disabled={isBusy}
+                            onClick={() => void processPayout(payout)}
+                          >
+                            {isBusy ? "Processing..." : "Process payout"}
+                          </Button>
+                        )}
 
-              })
+                        {payout.status === "PROCESSING" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isBusy}
+                            onClick={() => void verifyPayout(payout)}
+                          >
+                            {isBusy ? "Verifying..." : "Verify payout"}
+                          </Button>
+                        )}
 
-            ) : (
+                        {(payout.status === "FAILED" ||
+                          payout.status === "REVERSED") && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isBusy}
+                            onClick={() => void retryPayout(payout)}
+                          >
+                            {isBusy ? "Retrying..." : "Retry payout"}
+                          </Button>
+                        )}
 
-              <p className="py-5 text-sm text-slate-500">No payout requests.</p>
+                        {payout.status === "PAID" && (
+                          <span className="text-sm font-medium text-green-700">
+                            Payout completed
+                          </span>
+                        )}
+                      </div>
 
-            )}
+                      {payout.status === "PROCESSING" && (
+                        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-sm font-semibold text-[#102A56]">
+                            Finalize payout
+                          </p>
 
-          </CardContent>
+                          <p className="mt-1 text-xs text-slate-500">
+                            If this transfer is awaiting OTP confirmation, enter
+                            the OTP to finalize it. You can also verify its
+                            provider status before taking further action.
+                          </p>
 
-        </Card>
+                          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                            <div className="flex-1">
+                              <Field label="Transfer OTP">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="one-time-code"
+                                  maxLength={12}
+                                  placeholder="Enter OTP"
+                                  value={otpValues[payout.id] || ""}
+                                  onChange={(event) =>
+                                    setOtpValues((current) => ({
+                                      ...current,
 
-      </section>
-)}
+                                      [payout.id]: event.target.value,
+                                    }))
+                                  }
+                                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
+                                />
+                              </Field>
+                            </div>
 
-
+                            <Button
+                              size="sm"
+                              disabled={
+                                isBusy || !(otpValues[payout.id] || "").trim()
+                              }
+                              onClick={() => void finalizePayout(payout)}
+                            >
+                              {isBusy ? "Finalizing..." : "Finalize payout"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="py-5 text-sm text-slate-500">
+                  No payout requests.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Refund management */}
 
       {section === "payments" && (
-<section id="refunds" className="mt-6 scroll-mt-24">
+        <section id="refunds" className="mt-6 scroll-mt-24">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Payment refunds</CardTitle>
 
-        <Card>
+                <Badge>{refunds.length} records</Badge>
+              </div>
+            </CardHeader>
 
-          <CardHeader>
+            <CardContent>
+              <form
+                onSubmit={createRefund}
+                className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <h3 className="font-semibold text-[#102A56]">
+                  Initiate a refund
+                </h3>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Enter the payment ID and refund amount in kobo. The payment
+                  service validates the refundable balance and payout
+                  restrictions.
+                </p>
 
-              <CardTitle>Payment refunds</CardTitle>
-
-              <Badge>{refunds.length} records</Badge>
-
-            </div>
-
-          </CardHeader>
-
-
-
-          <CardContent>
-
-            <form
-
-              onSubmit={createRefund}
-
-              className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4"
-
-            >
-
-              <h3 className="font-semibold text-[#102A56]">
-
-                Initiate a refund
-
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-
-                Enter the payment ID and refund amount in kobo. The payment
-
-                service validates the refundable balance and payout
-
-                restrictions.
-
-              </p>
-
-
-
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-
-                <Field label="Payment ID">
-
-                  <input
-
-                    value={refundPaymentId}
-
-                    onChange={(event) => setRefundPaymentId(event.target.value)}
-
-                    placeholder="Enter payment ID"
-
-                    className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
-
-                    required
-
-                  />
-
-                </Field>
-
-
-
-                <Field label="Refund amount (kobo)">
-
-                  <input
-
-                    type="number"
-
-                    min="1"
-
-                    step="1"
-
-                    value={refundAmount}
-
-                    onChange={(event) => setRefundAmount(event.target.value)}
-
-                    placeholder="e.g. 150000"
-
-                    className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
-
-                    required
-
-                  />
-
-                </Field>
-
-
-
-                <div className="md:col-span-2">
-
-                  <Field label="Reason">
-
-                    <Textarea
-
-                      rows={3}
-
-                      minLength={3}
-
-                      maxLength={500}
-
-                      value={refundReason}
-
-                      onChange={(event) => setRefundReason(event.target.value)}
-
-                      placeholder="Explain why this payment is being refunded..."
-
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <Field label="Payment ID">
+                    <input
+                      value={refundPaymentId}
+                      onChange={(event) =>
+                        setRefundPaymentId(event.target.value)
+                      }
+                      placeholder="Enter payment ID"
+                      className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
                       required
-
                     />
-
                   </Field>
 
-                  <p className="mt-1 text-right text-xs text-slate-400">
+                  <Field label="Refund amount (kobo)">
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={refundAmount}
+                      onChange={(event) => setRefundAmount(event.target.value)}
+                      placeholder="e.g. 150000"
+                      className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#1769D2]"
+                      required
+                    />
+                  </Field>
 
-                    {refundReason.length}/500
+                  <div className="md:col-span-2">
+                    <Field label="Reason">
+                      <Textarea
+                        rows={3}
+                        minLength={3}
+                        maxLength={500}
+                        value={refundReason}
+                        onChange={(event) =>
+                          setRefundReason(event.target.value)
+                        }
+                        placeholder="Explain why this payment is being refunded..."
+                        required
+                      />
+                    </Field>
 
-                  </p>
-
+                    <p className="mt-1 text-right text-xs text-slate-400">
+                      {refundReason.length}/500
+                    </p>
+                  </div>
                 </div>
 
-              </div>
+                <div className="mt-4">
+                  <Button type="submit" disabled={creatingRefund}>
+                    {creatingRefund
+                      ? "Submitting refund..."
+                      : "Initiate refund"}
+                  </Button>
+                </div>
+              </form>
 
+              <div className="space-y-4">
+                {loading ? (
+                  <p className="py-5 text-sm text-slate-500">
+                    Loading refund records...
+                  </p>
+                ) : refunds.length ? (
+                  refunds.map((refund) => {
+                    const isBusy = busyRefund === refund.id;
 
+                    const canVerify =
+                      refund.status === "PENDING" ||
+                      refund.status === "PROCESSING";
 
-              <div className="mt-4">
-
-                <Button type="submit" disabled={creatingRefund}>
-
-                  {creatingRefund ? "Submitting refund..." : "Initiate refund"}
-
-                </Button>
-
-              </div>
-
-            </form>
-
-
-
-            <div className="space-y-4">
-
-              {loading ? (
-
-                <p className="py-5 text-sm text-slate-500">
-
-                  Loading refund records...
-
-                </p>
-
-              ) : refunds.length ? (
-
-                refunds.map((refund) => {
-
-                  const isBusy = busyRefund === refund.id;
-
-                  const canVerify =
-
-                    refund.status === "PENDING" ||
-
-                    refund.status === "PROCESSING";
-
-
-
-                  return (
-
-                    <div
-
-                      key={refund.id}
-
-                      className="rounded-xl border border-slate-200 p-4"
-
-                    >
-
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-
-                        <div>
-
-                          <p className="text-lg font-semibold text-[#102A56]">
-
-                            {money(refund.amount_minor, refund.currency)}
-
-                          </p>
-
-                          <p className="mt-1 break-all text-xs text-slate-500">
-
-                            Refund ID: {refund.id}
-
-                          </p>
-
-                          <p className="mt-1 break-all text-xs text-slate-500">
-
-                            Payment ID: {refund.payment_id}
-
-                          </p>
-
-                          <p className="mt-1 break-all text-xs text-slate-500">
-
-                            Provider reference:{" "}
-
-                            {refund.provider_reference || "Unavailable"}
-
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-500">
-
-                            Created: {formatDate(refund.created_at)}
-
-                          </p>
-
-                          {refund.processed_at && (
-
-                            <p className="mt-1 text-xs text-slate-500">
-
-                              Processed: {formatDate(refund.processed_at)}
-
+                    return (
+                      <div
+                        key={refund.id}
+                        className="rounded-xl border border-slate-200 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-lg font-semibold text-[#102A56]">
+                              {money(refund.amount_minor, refund.currency)}
                             </p>
 
-                          )}
+                            <p className="mt-1 break-all text-xs text-slate-500">
+                              Refund ID: {refund.id}
+                            </p>
 
-                        </div>
+                            <p className="mt-1 break-all text-xs text-slate-500">
+                              Payment ID: {refund.payment_id}
+                            </p>
 
+                            <p className="mt-1 break-all text-xs text-slate-500">
+                              Provider reference:{" "}
+                              {refund.provider_reference || "Unavailable"}
+                            </p>
 
+                            <p className="mt-1 text-xs text-slate-500">
+                              Created: {formatDate(refund.created_at)}
+                            </p>
 
-                        <Badge className={statusClass(refund.status)}>
-
-                          {refund.status}
-
-                        </Badge>
-
-                      </div>
-
-
-
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-
-                        <div>
-
-                          <p className="text-xs text-slate-400">Tutor share</p>
-
-                          <p className="mt-1 text-sm font-medium text-slate-700">
-
-                            {money(refund.tutor_share_minor, refund.currency)}
-
-                          </p>
-
-                        </div>
-
-                        <div>
-
-                          <p className="text-xs text-slate-400">
-
-                            Platform share
-
-                          </p>
-
-                          <p className="mt-1 text-sm font-medium text-slate-700">
-
-                            {money(
-
-                              refund.platform_share_minor,
-
-                              refund.currency,
-
+                            {refund.processed_at && (
+                              <p className="mt-1 text-xs text-slate-500">
+                                Processed: {formatDate(refund.processed_at)}
+                              </p>
                             )}
+                          </div>
 
-                          </p>
-
+                          <Badge className={statusClass(refund.status)}>
+                            {refund.status}
+                          </Badge>
                         </div>
 
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <p className="text-xs text-slate-400">
+                              Tutor share
+                            </p>
+
+                            <p className="mt-1 text-sm font-medium text-slate-700">
+                              {money(refund.tutor_share_minor, refund.currency)}
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-slate-400">
+                              Platform share
+                            </p>
+
+                            <p className="mt-1 text-sm font-medium text-slate-700">
+                              {money(
+                                refund.platform_share_minor,
+
+                                refund.currency,
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                          <p className="text-xs font-semibold text-slate-600">
+                            Reason
+                          </p>
+
+                          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
+                            {refund.reason}
+                          </p>
+                        </div>
+
+                        {refund.failure_reason && (
+                          <div className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3">
+                            <p className="text-xs font-semibold text-red-700">
+                              Failure reason
+                            </p>
+
+                            <p className="mt-1 whitespace-pre-wrap text-sm text-red-700">
+                              {refund.failure_reason}
+                            </p>
+                          </div>
+                        )}
+
+                        {canVerify && (
+                          <div className="mt-4">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={isBusy}
+                              onClick={() => void verifyRefund(refund)}
+                            >
+                              {isBusy ? "Verifying..." : "Verify refund"}
+                            </Button>
+                          </div>
+                        )}
                       </div>
-
-
-
-                      <div className="mt-3 rounded-lg bg-slate-50 p-3">
-
-                        <p className="text-xs font-semibold text-slate-600">
-
-                          Reason
-
-                        </p>
-
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-
-                          {refund.reason}
-
-                        </p>
-
-                      </div>
-
-
-
-                      {refund.failure_reason && (
-
-                        <div className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3">
-
-                          <p className="text-xs font-semibold text-red-700">
-
-                            Failure reason
-
-                          </p>
-
-                          <p className="mt-1 whitespace-pre-wrap text-sm text-red-700">
-
-                            {refund.failure_reason}
-
-                          </p>
-
-                        </div>
-
-                      )}
-
-
-
-                      {canVerify && (
-
-                        <div className="mt-4">
-
-                          <Button
-
-                            size="sm"
-
-                            variant="outline"
-
-                            disabled={isBusy}
-
-                            onClick={() => void verifyRefund(refund)}
-
-                          >
-
-                            {isBusy ? "Verifying..." : "Verify refund"}
-
-                          </Button>
-
-                        </div>
-
-                      )}
-
-                    </div>
-
-                  );
-
-                })
-
-              ) : (
-
-                <p className="py-5 text-sm text-slate-500">
-
-                  No refund records found.
-
-                </p>
-
-              )}
-
-            </div>
-
-          </CardContent>
-
-        </Card>
-
-      </section>
-)}
-
+                    );
+                  })
+                ) : (
+                  <p className="py-5 text-sm text-slate-500">
+                    No refund records found.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
     </AppShell>
-
   );
-
 }
