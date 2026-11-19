@@ -148,8 +148,7 @@ type UploadAction =
   | "video"
   | "identity"
   | "picture-delete"
-  | "video-delete"
-  | null;
+  | "video-delete";
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
@@ -354,6 +353,7 @@ function FileUploadCard({
   accept,
   fileName,
   busy,
+  progress,
   disabled = false,
   actionLabel,
   onChange,
@@ -365,6 +365,7 @@ function FileUploadCard({
   accept: string;
   fileName?: string | null;
   busy: boolean;
+  progress?: number | null;
   disabled?: boolean;
   actionLabel: string;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -397,6 +398,31 @@ function FileUploadCard({
         <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
           Create your tutor profile in Step 1 before uploading this file.
         </p>
+      )}
+
+      {busy && progress !== undefined && progress !== null && (
+        <div className="mt-4 space-y-2" aria-live="polite">
+          <div className="flex items-center justify-between text-xs font-medium text-slate-600">
+            <span>Uploading video</span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <div
+            className="h-2 overflow-hidden rounded-full bg-slate-100"
+            role="progressbar"
+            aria-label="Video upload progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress)}
+          >
+            <div
+              className="h-full rounded-full bg-[#00A99A] transition-[width] duration-200"
+              style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+            />
+          </div>
+          <p className="text-xs text-slate-500">
+            Keep this page open until the upload finishes.
+          </p>
+        </div>
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -520,7 +546,18 @@ export default function TutorOnboardingPage() {
   const [exists, setExists] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState<UploadAction>(null);
+  const [uploading, setUploading] = useState<UploadAction[]>([]);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+
+  function startUpload(action: UploadAction) {
+    setUploading((current) =>
+      current.includes(action) ? current : [...current, action],
+    );
+  }
+
+  function finishUpload(action: UploadAction) {
+    setUploading((current) => current.filter((item) => item !== action));
+  }
 
   /* Catalogue */
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -1157,7 +1194,7 @@ export default function TutorOnboardingPage() {
     const formData = new FormData();
     formData.append("file", file);
 
-    setUploading(action);
+    startUpload(action);
 
     try {
       return await api<UploadResponse>(endpoint, {
@@ -1165,7 +1202,7 @@ export default function TutorOnboardingPage() {
         body: formData,
       });
     } finally {
-      setUploading(null);
+      finishUpload(action);
     }
   }
 
@@ -1220,7 +1257,7 @@ export default function TutorOnboardingPage() {
   async function removeProfilePicture() {
     if (!exists) return;
 
-    setUploading("picture-delete");
+    startUpload("picture-delete");
 
     try {
       await api("/tutors/profile/picture", {
@@ -1234,7 +1271,7 @@ export default function TutorOnboardingPage() {
         getErrorMessage(error, "Could not remove your profile picture."),
       );
     } finally {
-      setUploading(null);
+      finishUpload("picture-delete");
     }
   }
 
@@ -1264,7 +1301,8 @@ export default function TutorOnboardingPage() {
       return;
     }
 
-    setUploading("video");
+    startUpload("video");
+    setVideoUploadProgress(0);
 
     try {
       // Step 1: Request a signed upload with a unique public_id.
@@ -1275,6 +1313,12 @@ export default function TutorOnboardingPage() {
         },
       );
 
+      if (authorization.overwrite !== false) {
+        throw new Error(
+          "The video upload signature returned an unexpected overwrite value.",
+        );
+      }
+
       // Step 2: Upload directly to Cloudinary.
       const cloudinaryForm = new FormData();
 
@@ -1282,37 +1326,65 @@ export default function TutorOnboardingPage() {
       cloudinaryForm.append("api_key", authorization.api_key);
       cloudinaryForm.append("timestamp", String(authorization.timestamp));
       cloudinaryForm.append("public_id", authorization.public_id);
-      cloudinaryForm.append("overwrite", "false");
+      // The value must match the value signed by the backend. Do not hardcode
+      // a different value or append the same parameter more than once.
+      cloudinaryForm.append("overwrite", String(authorization.overwrite));
       cloudinaryForm.append("signature", authorization.signature);
 
-      const cloudinaryResponse = await fetch(
-        `https://api.cloudinary.com/v1_1/${encodeURIComponent(
-          authorization.cloud_name,
-        )}/video/upload`,
-        {
-          method: "POST",
-          body: cloudinaryForm,
+      const cloudinaryResult = await new Promise<CloudinaryVideoUploadResponse>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open(
+            "POST",
+            `https://api.cloudinary.com/v1_1/${encodeURIComponent(
+              authorization.cloud_name,
+            )}/video/upload`,
+          );
+
+          xhr.upload.onprogress = (progressEvent) => {
+            if (progressEvent.lengthComputable && progressEvent.total > 0) {
+              setVideoUploadProgress(
+                Math.min(
+                  99,
+                  (progressEvent.loaded / progressEvent.total) * 100,
+                ),
+              );
+            }
+          };
+
+          xhr.onload = () => {
+            let result: CloudinaryVideoUploadResponse;
+            try {
+              result = JSON.parse(
+                xhr.responseText,
+              ) as CloudinaryVideoUploadResponse;
+            } catch {
+              reject(
+                new Error("Cloudinary returned an unreadable upload response."),
+              );
+              return;
+            }
+
+            if (xhr.status < 200 || xhr.status >= 300) {
+              reject(
+                new Error(
+                  result.error?.message ??
+                    "Cloudinary could not upload your introduction video.",
+                ),
+              );
+              return;
+            }
+
+            setVideoUploadProgress(100);
+            resolve(result);
+          };
+
+          xhr.onerror = () =>
+            reject(new Error("Network error while uploading your video."));
+          xhr.onabort = () => reject(new Error("Video upload was cancelled."));
+          xhr.send(cloudinaryForm);
         },
       );
-
-      const cloudinaryResult =
-        (await cloudinaryResponse.json()) as CloudinaryVideoUploadResponse;
-      console.error("Cloudinary upload response:", {
-        status: cloudinaryResponse.status,
-        statusText: cloudinaryResponse.statusText,
-        body: cloudinaryResult,
-        authorization: {
-          timestamp: authorization.timestamp,
-          public_id: authorization.public_id,
-          cloud_name: authorization.cloud_name,
-        },
-      });
-      if (!cloudinaryResponse.ok) {
-        throw new Error(
-          cloudinaryResult.error?.message ??
-            "Cloudinary could not upload your introduction video.",
-        );
-      }
 
       if (
         !cloudinaryResult.public_id ||
@@ -1345,13 +1417,13 @@ export default function TutorOnboardingPage() {
         getErrorMessage(error, "Could not upload your introduction video."),
       );
     } finally {
-      setUploading(null);
+      finishUpload("video");
     }
   }
   async function removeIntroductionVideo() {
     if (!exists) return;
 
-    setUploading("video-delete");
+    startUpload("video-delete");
 
     try {
       await api("/tutors/profile/introduction-video", {
@@ -1365,7 +1437,7 @@ export default function TutorOnboardingPage() {
         getErrorMessage(error, "Could not remove your introduction video."),
       );
     } finally {
-      setUploading(null);
+      finishUpload("video-delete");
     }
   }
 
@@ -2247,7 +2319,7 @@ export default function TutorOnboardingPage() {
                       <Button
                         type="submit"
                         disabled={
-                          busy || uploading !== null || creatingCommunity
+                          busy || uploading.length > 0 || creatingCommunity
                         }
                         className="w-full sm:w-auto"
                       >
@@ -2344,10 +2416,14 @@ export default function TutorOnboardingPage() {
                       <div className="mt-4 flex flex-wrap gap-3">
                         <Button
                           type="button"
-                          disabled={!exists || uploading !== null}
+                          disabled={
+                            !exists ||
+                            uploading.includes("picture") ||
+                            uploading.includes("picture-delete")
+                          }
                           onClick={() => pictureInputRef.current?.click()}
                         >
-                          {uploading === "picture" ? (
+                          {uploading.includes("picture") ? (
                             <Loader2 size={16} className="mr-2 animate-spin" />
                           ) : (
                             <Upload size={16} className="mr-2" />
@@ -2363,10 +2439,13 @@ export default function TutorOnboardingPage() {
                           <Button
                             type="button"
                             variant="outline"
-                            disabled={uploading !== null}
+                            disabled={
+                              uploading.includes("picture") ||
+                              uploading.includes("picture-delete")
+                            }
                             onClick={removeProfilePicture}
                           >
-                            {uploading === "picture-delete" ? (
+                            {uploading.includes("picture-delete") ? (
                               <Loader2
                                 size={16}
                                 className="mr-2 animate-spin"
@@ -2384,7 +2463,11 @@ export default function TutorOnboardingPage() {
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
                         className="hidden"
-                        disabled={!exists || uploading !== null}
+                        disabled={
+                          !exists ||
+                          uploading.includes("picture") ||
+                          uploading.includes("picture-delete")
+                        }
                         onChange={handleProfilePicture}
                       />
                     </div>
@@ -2473,7 +2556,11 @@ export default function TutorOnboardingPage() {
                       accept="video/mp4,video/webm"
                       fileName={videoUrl ? "Introduction video uploaded" : null}
                       busy={
-                        uploading === "video" || uploading === "video-delete"
+                        uploading.includes("video") ||
+                        uploading.includes("video-delete")
+                      }
+                      progress={
+                        uploading.includes("video") ? videoUploadProgress : null
                       }
                       disabled={!exists}
                       actionLabel={videoUrl ? "Replace video" : "Upload video"}
@@ -2519,7 +2606,7 @@ export default function TutorOnboardingPage() {
                       icon={<FileText size={21} />}
                       accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                       fileName={identityDocumentName}
-                      busy={uploading === "identity"}
+                      busy={uploading.includes("identity")}
                       disabled={!exists}
                       actionLabel={
                         identityDocumentName
@@ -2605,7 +2692,7 @@ export default function TutorOnboardingPage() {
                       <Button
                         type="submit"
                         disabled={
-                          busy || uploading !== null || !acceptNda || !exists
+                          busy || uploading.length > 0 || !acceptNda || !exists
                         }
                         className="w-full sm:w-auto"
                       >
