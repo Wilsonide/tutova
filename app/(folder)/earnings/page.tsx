@@ -34,6 +34,8 @@ type EarningsSummary = {
   currency: string;
   total_contract_amount_minor: number;
   total_platform_commission_minor: number;
+  total_tutor_commission_minor: number;
+  total_learner_fee_minor: number;
   total_tutor_earnings_minor: number;
   current_month_earnings_minor: number;
   paid_out_minor: number;
@@ -109,7 +111,7 @@ export default function EarningsPage() {
   return (
     <AppShell
       title="Earnings & payouts"
-      description="Track the monthly share of your tutoring contracts, amounts held by Tutova and payments released after the contract and lesson checks."
+      description="Track your monthly earnings, Tutova's commission deduction, learner platform fees and payouts after lesson checks."
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card><CardContent className="p-5"><p className="text-sm text-slate-500">This month's earnings</p><p className="mt-2 text-2xl font-black text-[#00A99A]">{money(summary?.current_month_earnings_minor ?? 0, summary?.currency ?? "NGN")}</p></CardContent></Card>
@@ -122,7 +124,22 @@ export default function EarningsPage() {
         <CardHeader><CardTitle>Contract breakdown</CardTitle></CardHeader>
         <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
           <div><p className="text-slate-500">Total paid by learners</p><p className="mt-1 text-lg font-bold">{money(summary?.total_contract_amount_minor ?? 0, summary?.currency ?? "NGN")}</p></div>
-          <div><p className="text-slate-500">Tutova commission deducted</p><p className="mt-1 text-lg font-bold">{money(summary?.total_platform_commission_minor ?? 0, summary?.currency ?? "NGN")}</p></div>
+          <div><p className="text-slate-500">Total Tutova commission</p><p className="mt-1 text-lg font-bold">{money(summary?.total_platform_commission_minor ?? 0, summary?.currency ?? "NGN")}</p></div>
+          <div><p className="text-slate-500">Your commission contribution</p><p className="mt-1 text-lg font-bold">{money(summary?.total_tutor_commission_minor ?? 0, summary?.currency ?? "NGN")}</p></div>
+          <div><p className="text-slate-500">Learner platform fees</p><p className="mt-1 text-lg font-bold">{money(summary?.total_learner_fee_minor ?? 0, summary?.currency ?? "NGN")}</p></div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader><CardTitle>Monthly Tutova commission policy</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm text-slate-600">
+          <p>The commission rate is based on the date an administrator approves your tutor verification. It is calculated monthly against your gross tutoring earnings.</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">First month</p><p>25% total · 12.5% tutor · 12.5% learner</p></div>
+            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">After 1 month, before 3 months</p><p>20% total · 10% tutor · 10% learner</p></div>
+            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">From 3 months</p><p>15% total · 7.5% tutor · 7.5% learner</p></div>
+          </div>
+          <p>The learner pays the other half as an additional platform fee. Your displayed earnings are after your contribution. The 15% rate begins on the exact three-month approval anniversary.</p>
         </CardContent>
       </Card>
 

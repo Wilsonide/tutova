@@ -101,7 +101,7 @@ export function SiteHeader() {
   const accountLabel = isAdmin
     ? "Go to Admin Dashboard"
     : isTutor && !isApprovedTutor
-      ? "Complete Profile"
+      ? "Go to Profile"
       : "Go to Dashboard";
 
   // Active route detection for dropdown sections.

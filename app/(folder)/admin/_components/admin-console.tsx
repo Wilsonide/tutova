@@ -342,6 +342,10 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
 
   const [payouts, setPayouts] = useState<Payout[]>([]);
 
+  const [payoutPeriodStart, setPayoutPeriodStart] = useState("");
+
+  const [preparingMonthlyPayouts, setPreparingMonthlyPayouts] = useState(false);
+
   const [allTutors, setAllTutors] = useState<AdminTutor[]>([]);
 
   const [refunds, setRefunds] = useState<Refund[]>([]);
@@ -657,6 +661,26 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
     );
   }
 
+  async function prepareMonthlyPayouts() {
+    if (!payoutPeriodStart) {
+      toast.error("Select the start date of the earning month.");
+      return;
+    }
+    setPreparingMonthlyPayouts(true);
+    try {
+      const result = await api<{ created_count: number; skipped_count: number }>(
+        `/payments/admin/payouts/prepare-month?period_start=${encodeURIComponent(payoutPeriodStart)}`,
+        { method: "POST" },
+      );
+      toast.success(`${result.created_count} monthly payout(s) prepared; ${result.skipped_count} skipped for review.`);
+      await load(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not prepare monthly payouts");
+    } finally {
+      setPreparingMonthlyPayouts(false);
+    }
+  }
+
   async function processPayout(payout: Payout) {
     if (payout.status !== "REQUESTED") return;
 
@@ -878,6 +902,12 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
       title="Admin console"
       description="Manage tutors, verification reviews, payouts and payment refunds."
     >
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Button asChild variant="outline"><Link href="/admin/requests">Review tutoring requests</Link></Button>
+        <Button asChild variant="outline"><Link href="/admin/progress">Review lesson progress reports</Link></Button>
+        <Button asChild variant="outline"><Link href="/agreements">Review tutoring agreements</Link></Button>
+      </div>
+
       {/* Tutor status confirmation modal */}
 
       {statusConfirmation && (
@@ -1748,7 +1778,20 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
       {/* Payouts */}
 
       {section === "payments" && (
-        <section id="payouts" className="mt-6 scroll-mt-24">
+        <section id="payouts" className="mt-6 scroll-mt-24 space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Prepare monthly tutor payouts</CardTitle></CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="payout-period-start">Select any date in the earning month</label>
+                <input id="payout-period-start" type="date" value={payoutPeriodStart} onChange={(event) => setPayoutPeriodStart(event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              </div>
+              <Button type="button" disabled={preparingMonthlyPayouts || !payoutPeriodStart} onClick={() => void prepareMonthlyPayouts()}>
+                {preparingMonthlyPayouts ? "Preparing…" : "Prepare eligible monthly payouts"}
+              </Button>
+            </CardContent>
+            <p className="px-6 pb-5 text-xs text-slate-500">This prepares admin-reviewable payout records for contract months in the selected calendar month that have ended and whose lessons are completed, learner-acknowledged and clear of unresolved disputes, refunds and reviews. It does not transfer funds automatically.</p>
+          </Card>
           <Card>
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">

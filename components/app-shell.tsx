@@ -19,6 +19,7 @@ import {
   X,
   GraduationCap,
   ClipboardCheck,
+  FileText,
   ChevronRight,
 } from "lucide-react";
 
@@ -31,11 +32,8 @@ const learnerNav = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/requests", label: "Requests", icon: Users },
   { href: "/lessons", label: "Lessons", icon: CalendarDays },
-  {
-    href: "/progress",
-    label: "Learning progress",
-    icon: ChartNoAxesColumn,
-  },
+  { href: "/agreements", label: "Agreements", icon: FileText },
+  { href: "/progress", label: "Learning progress", icon: ChartNoAxesColumn },
   { href: "/payments", label: "Payments", icon: Wallet },
 ];
 
@@ -53,17 +51,16 @@ const tutorNav = [
   },
   { href: "/requests", label: "Requests", icon: Users },
   { href: "/lessons", label: "Lessons", icon: CalendarDays },
-  {
-    href: "/progress",
-    label: "Progress reports",
-    icon: ChartNoAxesColumn,
-  },
+  { href: "/agreements", label: "Agreements", icon: FileText },
+  { href: "/progress", label: "Progress reports", icon: ChartNoAxesColumn },
   { href: "/earnings", label: "Earnings & payouts", icon: Wallet },
 ];
 
 const adminNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
-
+  { href: "/admin/requests", label: "Tutoring requests", icon: Users },
+  { href: "/admin/progress", label: "Progress reports", icon: ChartNoAxesColumn },
+  { href: "/agreements", label: "Agreements", icon: FileText },
   {
     href: "/safeguarding",
     label: "Safety & reports",

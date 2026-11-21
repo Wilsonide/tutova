@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
-import { api } from "@/lib/api";
+import { api, money } from "@/lib/api";
 import type { TutoringRequest, Subject, Location } from "@/lib/types";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,13 +37,18 @@ type RequestRow = TutoringRequest & {
   assigned_tutor_id?: string | null;
   requester_first_name?: string;
   requester_last_name?: string;
+  requester_profile_picture_url?: string | null;
   requester_account_type?: string | null;
   subject_name?: string;
   location_name?: string | null;
+  my_response?: "ACCEPTED" | "DECLINED" | null;
+  selected_tutor_response?: "ACCEPTED" | "DECLINED" | null;
 };
 
 type MatchingTutor = {
   tutor_user_id: string;
+  tutor_profile_id?: string | null;
+  response_decision?: "ACCEPTED" | "DECLINED" | null;
   first_name: string;
   last_name: string;
   bio: string | null;
@@ -55,6 +61,7 @@ type MatchingTutor = {
   service_area: string | null;
   subjects: string[];
   locations: string[];
+  profile_picture_url?: string | null;
   match_level: "STRONG" | "PARTIAL";
   match_reasons: string[];
   unmatched_criteria: string[];
@@ -134,6 +141,16 @@ type LessonBooking = {
 };
 
 type AccountProfileStatus = "loading" | "ready" | "missing" | "error";
+
+type CheckoutPreview = {
+  checkout_url: string;
+  provider_reference: string;
+  amount_minor: number;
+  tutoring_amount_minor: number;
+  learner_fee_minor: number;
+  currency: string;
+  commission_bps: number;
+};
 
 /**
  * Sort tutoring requests:
@@ -278,15 +295,23 @@ function getRequesterType(request: RequestRow) {
 
 function getRequestStatusDescription(request: RequestRow) {
   if (request.status === "ACCEPTED") {
-    return "A tutor has accepted this request. You can now request a lesson session.";
+    return "A tutor has been selected for this request. You can now arrange the lesson.";
+  }
+
+  if (
+    request.status === "OPEN" &&
+    request.selected_tutor_id &&
+    request.selected_tutor_response === "DECLINED"
+  ) {
+    return "The selected tutor declined this request. Cancel it and submit a new request to choose another tutor.";
   }
 
   if (request.status === "OPEN" && request.selected_tutor_id) {
-    return "This request has been directed to your selected tutor.";
+    return "Your direct request has been sent to the selected tutor. The tutor must accept it before you can schedule a lesson and make payment.";
   }
 
   if (request.status === "OPEN") {
-    return "Your request is open and available for matching tutors.";
+    return "Your request is open. Tutors can express interest, and you can select one of the tutors who accepts.";
   }
 
   if (request.status === "CANCELLED") {
@@ -301,7 +326,7 @@ function getBookingStatusLabel(status: BookingStatus) {
     case "PENDING_TUTOR_CONFIRMATION":
       return "Awaiting tutor response";
     case "PENDING_CONFIRMATION":
-      return "Awaiting learner confirmation";
+      return "Agreement review";
     case "CONFIRMED":
       return "Confirmed";
     case "DECLINED":
@@ -408,6 +433,16 @@ function BookingDetails({
         </div>
       )}
 
+      {booking.status === "PENDING_CONFIRMATION" && (
+        <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Tutor has accepted the paid booking request. Review the agreement to
+          accept the proposed terms.
+          <Link href="/agreements" className="ml-2 font-semibold underline">
+            Open agreement
+          </Link>
+        </div>
+      )}
+
       {booking.cancellation_reason && (
         <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2">
           <p className="text-xs font-semibold text-slate-500">
@@ -481,8 +516,15 @@ export default function RequestsPage() {
   const [startAt, setStartAt] = useState("");
   const [duration, setDuration] = useState("60");
   const [contractMonths, setContractMonths] = useState("1");
-  const [monthlyArrangementId, setMonthlyArrangementId] = useState<string | null>(null);
+  const [monthlyArrangementId, setMonthlyArrangementId] = useState<
+    string | null
+  >(null);
   const [lessonNotes, setLessonNotes] = useState("");
+  const [checkoutPreview, setCheckoutPreview] =
+    useState<CheckoutPreview | null>(null);
+  const [tutorProfiles, setTutorProfiles] = useState<
+    Record<string, PublicTutor>
+  >({});
 
   // Booking actions.
   const [bookingActionId, setBookingActionId] = useState<string | null>(null);
@@ -517,6 +559,14 @@ export default function RequestsPage() {
 
         if (!cancelled) {
           setSelectedTutor(result);
+          if (result.tutoring_modes?.length) {
+            setMode((currentMode) =>
+              result.tutoring_modes.includes(currentMode)
+                ? currentMode
+                : result.tutoring_modes[0],
+            );
+          }
+          setLocationId("");
         }
       } catch (error) {
         console.error("Failed to load selected tutor:", error);
@@ -838,7 +888,8 @@ export default function RequestsPage() {
       !subjectId ||
       !description.trim() ||
       description.trim().length < 10 ||
-      (mode === "IN_PERSON" && (!stateId || !lgaId || !locationId))
+      ((mode === "IN_PERSON" || mode === "HYBRID") &&
+        (!locationId || (!selectedTutor && (!stateId || !lgaId))))
     ) {
       toast.error("Please complete all required fields.");
       return;
@@ -885,7 +936,8 @@ export default function RequestsPage() {
     try {
       const payload = {
         subject_id: subjectId,
-        location_id: mode === "IN_PERSON" ? locationId : null,
+        location_id:
+          mode === "IN_PERSON" || mode === "HYBRID" ? locationId : null,
         tutoring_mode: mode,
         description: description.trim(),
         preferred_schedule: schedule.trim() || null,
@@ -993,13 +1045,51 @@ export default function RequestsPage() {
         body: JSON.stringify({ decision }),
       });
 
+      const selectedRequest = rows.find((request) => request.id === id);
       toast.success(
-        decision === "ACCEPT" ? "Request accepted" : "Request declined",
+        decision === "ACCEPT"
+          ? selectedRequest?.selected_tutor_id
+            ? "Direct tutoring request accepted"
+            : "Interest sent. The learner can now review and select you."
+          : selectedRequest?.selected_tutor_id
+            ? "Direct tutoring request declined"
+            : "Request declined",
       );
 
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not respond");
+    }
+  }
+
+  async function selectRespondingTutor(
+    requestId: string,
+    tutor: MatchingTutor,
+  ) {
+    if (!tutor.tutor_profile_id) {
+      toast.error(
+        "This tutor response is missing its profile reference. Refresh the request and try again.",
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      await api(
+        `/tutoring-requests/mine/${encodeURIComponent(requestId)}/select-tutor/${encodeURIComponent(tutor.tutor_profile_id)}`,
+        { method: "POST" },
+      );
+      toast.success(
+        `${tutor.first_name} ${tutor.last_name} has been selected. You can now arrange the lessons.`,
+      );
+      setMatchingRequestId(null);
+      setMatchingTutors([]);
+      await load();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not select this tutor",
+      );
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -1029,39 +1119,78 @@ export default function RequestsPage() {
     );
 
     if (!selectedRequest || selectedRequest.status !== "ACCEPTED") {
-      toast.error("Only accepted tutoring requests can be booked.");
+      toast.error(
+        "The tutor must accept your tutoring request before you can schedule and pay for a lesson.",
+      );
       return;
     }
 
     setBusy(true);
 
     try {
-      const createdBooking = await api<{ monthly_arrangement_id?: string }>(
-        `/session-bookings/requests/${encodeURIComponent(bookingRequest)}`,
+      const existingArrangementId =
+        monthlyArrangementId ||
+        bookings.find(
+          (item) =>
+            item.tutoring_request_id === bookingRequest &&
+            item.monthly_arrangement_id,
+        )?.monthly_arrangement_id ||
+        null;
+      const bookingPayload = {
+        start_at: proposedStart.toISOString(),
+        duration_minutes: Number(duration),
+        contract_months: Number(contractMonths),
+        monthly_arrangement_id: existingArrangementId,
+        lesson_notes: lessonNotes.trim() || null,
+      };
+
+      // An active monthly arrangement has already been paid for. Additional
+      // lessons under that contract can be booked without another checkout.
+      if (existingArrangementId) {
+        const createdBooking = await api<LessonBooking>(
+          `/session-bookings/requests/${encodeURIComponent(bookingRequest)}`,
+          {
+            method: "POST",
+            body: JSON.stringify(bookingPayload),
+          },
+        );
+        toast.success(
+          "Your lesson has been added to the paid contract. The tutor has been notified.",
+        );
+        setBookingRequest("");
+        setStartAt("");
+        setDuration("60");
+        setLessonNotes("");
+        await load();
+        return;
+      }
+
+      // First booking: initialize checkout against the tutoring request.
+      // No LessonBooking row is created until Paystack confirms payment.
+      const payment = await api<CheckoutPreview>(
+        `/payments/requests/${encodeURIComponent(bookingRequest)}/initialize`,
         {
           method: "POST",
+          headers: { "Idempotency-Key": crypto.randomUUID() },
           body: JSON.stringify({
-            start_at: proposedStart.toISOString(),
-            duration_minutes: Number(duration),
-            contract_months: Number(contractMonths),
-            monthly_arrangement_id: monthlyArrangementId,
-            lesson_notes: lessonNotes.trim() || null,
+            start_at: bookingPayload.start_at,
+            duration_minutes: bookingPayload.duration_minutes,
+            contract_months: bookingPayload.contract_months,
+            lesson_notes: bookingPayload.lesson_notes,
           }),
         },
       );
-      if (createdBooking.monthly_arrangement_id) {
-        setMonthlyArrangementId(createdBooking.monthly_arrangement_id);
+
+      if (!payment.checkout_url) {
+        throw new Error(
+          "Paystack did not return a checkout URL. No booking has been created.",
+        );
       }
 
-      toast.success("Your lesson booking request has been sent to the tutor.");
-
-      setBookingRequest("");
-      setStartAt("");
-      setDuration("60");
-      setContractMonths("1");
-      setLessonNotes("");
-
-      await load();
+      setCheckoutPreview(payment);
+      toast.success(
+        "Your payment summary is ready. Review it before continuing.",
+      );
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -1074,6 +1203,11 @@ export default function RequestsPage() {
   }
 
   // Tutor accepts a learner's booking request.
+  function continueToPayment() {
+    if (!checkoutPreview?.checkout_url) return;
+    window.location.assign(checkoutPreview.checkout_url);
+  }
+
   async function acceptBooking(booking: LessonBooking) {
     const relatedRequest = rows.find(
       (request) => request.id === booking.tutoring_request_id,
@@ -1193,267 +1327,156 @@ export default function RequestsPage() {
   // Sorted requests are used by both dashboards.
   const prioritizedRows = sortRequests(rows);
 
-  // Tutor dashboard.
+  // Tutor dashboard. Each tutoring request is the parent record; all lesson
+  // bookings created from it are rendered inside the same card.
   if (isTutor) {
-    const tutorBookings = sortBookings(
-      bookings.filter((booking) =>
-        [
-          "PENDING_TUTOR_CONFIRMATION",
-          "PENDING_CONFIRMATION",
-          "CONFIRMED",
-          "AWAITING_LEARNER_ACKNOWLEDGEMENT",
-          "DISPUTED",
-        ].includes(booking.status),
+    const tutorRequestIds = new Set(
+      prioritizedRows.map((request) => request.id),
+    );
+    const unlinkedBookings = sortBookings(
+      bookings.filter(
+        (booking) => !tutorRequestIds.has(booking.tutoring_request_id),
       ),
-    );
-
-    const pendingTutorBookings = tutorBookings.filter(
-      (booking) => booking.status === "PENDING_TUTOR_CONFIRMATION",
-    );
-
-    const otherTutorBookings = tutorBookings.filter(
-      (booking) => booking.status !== "PENDING_TUTOR_CONFIRMATION",
     );
 
     return (
       <AppShell
         title="Tutoring requests"
-        description="Review matching tutoring requests and manage lesson booking requests from learners."
+        description="Review learner requests and manage every lesson booking from the same request card."
       >
         <div className="space-y-6">
-          {/* Incoming booking requests */}
-          <section>
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-[#102A56]">
-                  Incoming lesson booking requests
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Learners choose their preferred lesson time. Review each
-                  request and accept or decline it.
+          <div className="flex flex-col gap-3 rounded-2xl border border-[#DCE8F5] bg-gradient-to-r from-[#F5F9FF] to-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div>
+              <p className="text-sm font-semibold text-[#102A56]">
+                Your request workspace
+              </p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                A learner's request and every lesson booked from it stay
+                together. Open a request to review its details, then handle its
+                lesson bookings in the panel beside it.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void load()}
+              disabled={loading}
+              className="shrink-0 bg-white"
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              />
+              Refresh requests
+            </Button>
+          </div>
+
+          {loading ? (
+            <Card>
+              <CardContent className="p-8 text-center text-sm text-slate-500">
+                Loading your tutoring requests and lesson bookings…
+              </CardContent>
+            </Card>
+          ) : prioritizedRows.length === 0 ? (
+            <Card>
+              <CardContent className="p-10 text-center">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-blue-50 text-[#1769D2]">
+                  <CalendarDays className="h-6 w-6" />
+                </div>
+                <p className="mt-4 font-semibold text-[#102A56]">
+                  No tutoring requests yet
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500">
+                  New requests that match your subjects, teaching modes and
+                  service locations will appear here. Lesson bookings will be
+                  displayed inside their related request.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#102A56]">
+                    Learner requests
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {prioritizedRows.length}{" "}
+                    {prioritizedRows.length === 1 ? "request" : "requests"} in
+                    your workspace
+                  </p>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Newest requests are shown first within each status.
                 </p>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void load()}
-                disabled={loading}
-              >
-                <RefreshCw
-                  className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </Button>
-            </div>
+              {prioritizedRows.map((request) => {
+                const requestBookings = sortBookings(
+                  bookings.filter(
+                    (booking) => booking.tutoring_request_id === request.id,
+                  ),
+                );
+                const isDirectRequest = Boolean(request.selected_tutor_id);
+                const hasResponded = Boolean(request.my_response);
+                const canRespond = request.status === "OPEN" && !hasResponded;
+                const hasPendingTutorBooking = requestBookings.some(
+                  (booking) => booking.status === "PENDING_TUTOR_CONFIRMATION",
+                );
+                const initials =
+                  `${request.requester_first_name?.[0] ?? ""}${request.requester_last_name?.[0] ?? ""}`.toUpperCase();
 
-            {loading ? (
-              <p className="text-sm text-slate-500">
-                Loading booking requests…
-              </p>
-            ) : pendingTutorBookings.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <CalendarDays className="mx-auto h-8 w-8 text-slate-400" />
-                  <p className="mt-3 font-medium text-slate-800">
-                    No pending booking requests
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    New booking requests from learners will appear here.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {pendingTutorBookings.map((booking) => {
-                  const relatedRequest = rows.find(
-                    (request) => request.id === booking.tutoring_request_id,
-                  );
-
-                  return (
-                    <Card key={booking.id}>
-                      <CardContent className="p-5">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <BookingStatusBadge status={booking.status} />
-                              <span className="text-xs text-slate-400">
-                                Booking {booking.id.slice(0, 8)}
-                              </span>
+                return (
+                  <Card
+                    key={request.id}
+                    className="overflow-hidden border-slate-200 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+                  >
+                    <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-4 sm:px-5">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-3">
+                          {request.requester_profile_picture_url ? (
+                            <img
+                              src={request.requester_profile_picture_url}
+                              alt={getRequesterName(request)}
+                              className="h-12 w-12 shrink-0 rounded-full border border-white object-cover shadow-sm"
+                            />
+                          ) : (
+                            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-blue-100 bg-blue-50 text-sm font-bold text-[#1769D2]">
+                              {initials || <UserRound className="h-5 w-5" />}
                             </div>
-
-                            <div className="mt-3 flex items-start gap-2 text-sm text-slate-700">
-                              <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                              {formatDateTime(booking.start_at)}
-                            </div>
-
-                            <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
-                              <Clock3 className="h-4 w-4 text-slate-400" />
-                              {booking.duration_minutes} minutes
-                            </div>
-
-                            <div className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-800">
-                              <Wallet className="h-4 w-4 text-slate-400" />
-                              {formatBookingAmount(booking)}
-                            </div>
-                          </div>
-
-                          {relatedRequest && (
-                            <Badge>
-                              {relatedRequest.tutoring_mode.replaceAll(
-                                "_",
-                                " ",
-                              )}
-                            </Badge>
                           )}
-                        </div>
-
-                        {relatedRequest && (
-                          <div className="mt-4 rounded-xl bg-slate-50 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                              Tutoring request
-                            </p>
-                            <p className="mt-1 font-medium text-slate-800">
-                              {relatedRequest.subject_name || "Learning area"}
-                            </p>
-                            <p className="mt-1 text-sm text-slate-600">
-                              {relatedRequest.description}
-                            </p>
-                          </div>
-                        )}
-
-                        {booking.lesson_notes && (
-                          <div className="mt-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                              Learner's lesson notes
-                            </p>
-                            <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                              {booking.lesson_notes}
-                            </p>
-                          </div>
-                        )}
-
-                        <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                          <Button
-                            type="button"
-                            disabled={bookingActionId === booking.id}
-                            onClick={() => void acceptBooking(booking)}
-                          >
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            {bookingActionId === booking.id
-                              ? "Please wait…"
-                              : "Accept booking"}
-                          </Button>
-
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={bookingActionId === booking.id}
-                            onClick={() => void declineBooking(booking.id)}
-                            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Decline
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Tutoring requests */}
-          <section>
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-[#102A56]">
-                Matching tutoring requests
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Review requests that match your profile. Accept a tutoring
-                request before a learner can book a lesson with you.
-              </p>
-            </div>
-
-            {loading ? (
-              <p className="text-sm text-slate-500">
-                Loading tutoring requests…
-              </p>
-            ) : prioritizedRows.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <RefreshCw className="mx-auto h-7 w-7 text-slate-400" />
-                  <p className="mt-3 font-medium text-slate-800">
-                    No matching tutoring requests available
-                  </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    New requests matching your profile will appear here.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {prioritizedRows.map((request) => {
-                  const requestBookings = sortBookings(
-                    bookings.filter(
-                      (booking) => booking.tutoring_request_id === request.id,
-                    ),
-                  );
-
-                  return (
-                    <Card key={request.id}>
-                      <CardContent className="p-5">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[#1769D2]">
-                              <UserRound className="h-6 w-6" />
-                            </div>
-
-                            <div className="min-w-0">
-                              <h3 className="font-semibold text-[#102A56]">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="truncate font-semibold text-[#102A56]">
                                 {getRequesterName(request)}
                               </h3>
-
-                              <div className="mt-1 flex flex-wrap items-center gap-2">
-                                <Badge>{getRequesterType(request)}</Badge>
-                                <Badge>{request.status}</Badge>
-                                <span className="text-xs text-slate-400">
-                                  Submitted {formatDate(request.created_at)}
-                                </span>
-                              </div>
+                              <Badge>{getRequesterType(request)}</Badge>
+                              {isDirectRequest && (
+                                <Badge className="border-slate-200 bg-white text-slate-600">
+                                  Direct request
+                                </Badge>
+                              )}
                             </div>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Submitted {formatDate(request.created_at)} ·{" "}
+                              {request.subject_name || "Learning area"}
+                            </p>
                           </div>
-
-                          <Badge>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                          <Badge>{request.status.replaceAll("_", " ")}</Badge>
+                          <Badge className="border-slate-200 bg-white text-slate-600">
                             {request.tutoring_mode.replaceAll("_", " ")}
                           </Badge>
                         </div>
+                      </div>
+                    </div>
 
-                        <div className="mt-5 grid gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
+                    <CardContent className="p-4 sm:p-5">
+                      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                        {/* Request details and tutor response stay on the left. */}
+                        <div className="min-w-0 space-y-4">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                              Subject / learning area
-                            </p>
-                            <p className="mt-1 text-sm font-medium text-slate-800">
-                              {request.subject_name || "Not specified"}
-                            </p>
-                          </div>
-
-                          {request.location_name && (
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                Preferred location
-                              </p>
-                              <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-800">
-                                <MapPin className="h-4 w-4 text-slate-400" />
-                                {request.location_name}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="sm:col-span-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                               Learning goals and requirements
                             </p>
@@ -1462,102 +1485,367 @@ export default function RequestsPage() {
                             </p>
                           </div>
 
-                          {request.preferred_schedule && (
-                            <div className="sm:col-span-2">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                Preferred schedule
+                          <div className="grid gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-2">
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Subject
                               </p>
-                              <p className="mt-1 text-sm text-slate-700">
-                                {request.preferred_schedule}
+                              <p className="mt-1 text-sm font-medium text-slate-800">
+                                {request.subject_name || "Not specified"}
                               </p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Tutoring mode
+                              </p>
+                              <p className="mt-1 text-sm font-medium text-slate-800">
+                                {request.tutoring_mode.replaceAll("_", " ")}
+                              </p>
+                            </div>
+                            {request.location_name && (
+                              <div className="sm:col-span-2">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                  Preferred location
+                                </p>
+                                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                                  <MapPin className="h-4 w-4 text-slate-400" />
+                                  {request.location_name}
+                                </p>
+                              </div>
+                            )}
+                            {request.preferred_schedule && (
+                              <div className="sm:col-span-2">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                  Preferred schedule
+                                </p>
+                                <p className="mt-1 text-sm text-slate-700">
+                                  {request.preferred_schedule}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {request.status === "OPEN" && isDirectRequest && (
+                            <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-3 text-sm leading-6 text-blue-900">
+                              This learner sent the request directly to you.
+                              Accept it to allow the learner to arrange a lesson
+                              and make payment, or decline it if you cannot take
+                              it on.
+                            </div>
+                          )}
+
+                          {request.status === "OPEN" && hasResponded && (
+                            <div
+                              className={`rounded-xl p-3 text-sm leading-6 ${request.my_response === "ACCEPTED" ? "border border-emerald-100 bg-emerald-50 text-emerald-900" : "border border-slate-200 bg-slate-50 text-slate-700"}`}
+                            >
+                              {request.my_response === "ACCEPTED"
+                                ? isDirectRequest
+                                  ? "You accepted this direct request. The learner can now arrange a lesson and complete payment."
+                                  : "You expressed interest. The learner will review your response and may select you."
+                                : "You declined this request. It will remain in your request history."}
+                            </div>
+                          )}
+
+                          {request.status === "ACCEPTED" && (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                              <div className="flex items-start gap-2">
+                                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+                                <div>
+                                  <p className="text-sm font-semibold text-emerald-950">
+                                    {isDirectRequest
+                                      ? "You accepted this direct request"
+                                      : "The learner selected you"}
+                                  </p>
+                                  <p className="mt-1 text-xs leading-5 text-emerald-800">
+                                    The learner can now propose a lesson time
+                                    and pay for the contract. Any resulting
+                                    booking request will appear beside this
+                                    tutoring request.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {canRespond && (
+                            <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                              <Button
+                                onClick={() =>
+                                  void decide(request.id, "ACCEPT")
+                                }
+                                className="shadow-sm transition-transform hover:-translate-y-0.5"
+                              >
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                {isDirectRequest
+                                  ? "Accept request"
+                                  : "Express interest"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  void decide(request.id, "DECLINE")
+                                }
+                                className="border-red-200 text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                              >
+                                <X className="mr-2 h-4 w-4" />
+                                Decline
+                              </Button>
                             </div>
                           )}
                         </div>
 
-                        {request.status === "OPEN" && (
-                          <div className="mt-5 flex flex-wrap justify-end gap-2">
-                            <Button
-                              onClick={() => void decide(request.id, "ACCEPT")}
-                            >
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
-                              Accept request
-                            </Button>
-
-                            <Button
-                              variant="outline"
-                              onClick={() => void decide(request.id, "DECLINE")}
-                            >
-                              <X className="mr-2 h-4 w-4" />
-                              Decline
-                            </Button>
-                          </div>
-                        )}
-
-                        {request.status === "ACCEPTED" && (
-                          <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                            <div className="flex items-start gap-2">
-                              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
-                              <div>
-                                <p className="font-medium text-emerald-900">
-                                  You accepted this tutoring request
-                                </p>
-                                <p className="mt-1 text-sm leading-6 text-emerald-800">
-                                  The learner can now choose a lesson date and
-                                  time and send you a booking request. You will
-                                  review and accept or decline each booking.
-                                </p>
-                              </div>
+                        {/* Every booking created from this request lives on the right. */}
+                        <div className="min-w-0 rounded-2xl border border-slate-200 bg-[#FBFCFE] p-3 sm:p-4">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <h4 className="font-semibold text-[#102A56]">
+                                Lesson bookings
+                              </h4>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                Bookings linked to this tutoring request
+                              </p>
                             </div>
+                            <Badge className="border-slate-200 bg-white text-slate-600">
+                              {requestBookings.length}{" "}
+                              {requestBookings.length === 1
+                                ? "booking"
+                                : "bookings"}
+                            </Badge>
                           </div>
-                        )}
 
-                        {requestBookings.length > 0 && (
-                          <div className="mt-5 space-y-3">
-                            <h4 className="text-sm font-semibold text-slate-800">
-                              Booking activity
-                            </h4>
+                          {requestBookings.length === 0 ? (
+                            <div className="flex min-h-36 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center">
+                              <CalendarDays className="h-6 w-6 text-slate-300" />
+                              <p className="mt-2 text-sm font-medium text-slate-700">
+                                No lesson booking yet
+                              </p>
+                              <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">
+                                {request.status === "ACCEPTED"
+                                  ? "The learner can now choose a lesson time and complete payment. The booking will appear here after payment succeeds."
+                                  : "Once this request is accepted and the learner completes payment, the lesson booking will appear here."}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {requestBookings.map((booking, index) => (
+                                <div
+                                  key={booking.id}
+                                  className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <BookingStatusBadge
+                                        status={booking.status}
+                                      />
+                                      <span className="text-[11px] text-slate-400">
+                                        Lesson {index + 1}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs font-semibold text-slate-800">
+                                      {formatBookingAmount(booking)}
+                                    </span>
+                                  </div>
+                                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                    <div className="flex items-start gap-2 text-sm text-slate-700">
+                                      <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                                      <span>
+                                        {formatDateTime(booking.start_at)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                                      <Clock3 className="h-4 w-4 shrink-0 text-slate-400" />
+                                      {booking.duration_minutes} minutes
+                                    </div>
+                                  </div>
+                                  {booking.lesson_notes && (
+                                    <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                        Learner's lesson notes
+                                      </p>
+                                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                                        {booking.lesson_notes}
+                                      </p>
+                                    </div>
+                                  )}
+                                  {booking.meeting_link && (
+                                    <div className="mt-3 rounded-lg bg-blue-50 p-3">
+                                      <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                                        Meeting link
+                                      </p>
+                                      <a
+                                        href={booking.meeting_link}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="mt-1 block break-all text-sm text-blue-700 underline underline-offset-2"
+                                      >
+                                        {booking.meeting_link}
+                                      </a>
+                                    </div>
+                                  )}
+                                  {booking.cancellation_reason && (
+                                    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                        Decline / cancellation reason
+                                      </p>
+                                      <p className="mt-1">
+                                        {booking.cancellation_reason}
+                                      </p>
+                                    </div>
+                                  )}
 
-                            {requestBookings.map((booking) => (
-                              <BookingDetails
-                                key={booking.id}
-                                booking={booking}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                                  {booking.status ===
+                                    "PENDING_TUTOR_CONFIRMATION" && (
+                                    <>
+                                      <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                                        The learner has paid and submitted this
+                                        lesson request. Review the proposed time
+                                        and accept or decline the booking.
+                                      </div>
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        <Button
+                                          size="sm"
+                                          disabled={
+                                            bookingActionId === booking.id
+                                          }
+                                          onClick={() =>
+                                            void acceptBooking(booking)
+                                          }
+                                        >
+                                          <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                                          {bookingActionId === booking.id
+                                            ? "Please wait…"
+                                            : "Accept lesson"}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={
+                                            bookingActionId === booking.id
+                                          }
+                                          onClick={() =>
+                                            void declineBooking(booking.id)
+                                          }
+                                          className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                        >
+                                          <X className="mr-1.5 h-4 w-4" />
+                                          Decline
+                                        </Button>
+                                      </div>
+                                    </>
+                                  )}
+
+                                  {booking.status ===
+                                    "PENDING_CONFIRMATION" && (
+                                    <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                                      This is a legacy booking awaiting
+                                      agreement review.{" "}
+                                      <Link
+                                        href="/agreements"
+                                        className="font-semibold underline"
+                                      >
+                                        Open agreements
+                                      </Link>
+                                      .
+                                    </div>
+                                  )}
+                                  {booking.status === "CONFIRMED" && (
+                                    <div className="mt-3 rounded-lg bg-blue-50 p-3 text-xs leading-5 text-blue-800">
+                                      This lesson is confirmed. Keep the learner
+                                      updated if any arrangements change.
+                                    </div>
+                                  )}
+                                  {booking.status ===
+                                    "AWAITING_LEARNER_ACKNOWLEDGEMENT" && (
+                                    <div className="mt-3 rounded-lg bg-purple-50 p-3 text-xs leading-5 text-purple-800">
+                                      You marked this lesson as completed. The
+                                      learner must acknowledge completion or
+                                      raise a dispute before the payout process
+                                      can continue.
+                                      {booking.acknowledgement_deadline_at && (
+                                        <p className="mt-1 font-medium">
+                                          Acknowledgement deadline:{" "}
+                                          {formatDateTime(
+                                            booking.acknowledgement_deadline_at,
+                                          )}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                  {booking.status === "DISPUTED" && (
+                                    <div className="mt-3 rounded-lg bg-red-50 p-3 text-xs leading-5 text-red-800">
+                                      This lesson is under admin review.{" "}
+                                      {booking.dispute_reason
+                                        ? `Reason: ${booking.dispute_reason}`
+                                        : "Tutova will review the reported issue."}
+                                    </div>
+                                  )}
+                                  {booking.status === "DECLINED" && (
+                                    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                                      You declined this lesson booking.
+                                    </div>
+                                  )}
+                                  {booking.status === "CANCELLED" && (
+                                    <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                                      This lesson booking was cancelled.
+                                    </div>
+                                  )}
+                                  {booking.status === "COMPLETED" && (
+                                    <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">
+                                      This lesson has been completed and
+                                      acknowledged.
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </section>
+          )}
+
+          {unlinkedBookings.length > 0 && (
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-base font-semibold text-[#102A56]">
+                  Other lesson activity
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  These bookings were returned by your booking history but their
+                  tutoring request is not in the current matching-request list.
+                </p>
               </div>
-            )}
-          </section>
-
-          {/* Tutor's confirmed and ongoing bookings */}
-          <section>
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-[#102A56]">
-                Your lesson bookings
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Track confirmed lessons and lesson completion acknowledgement.
-              </p>
-            </div>
-
-            {otherTutorBookings.length === 0 ? (
-              <Card>
-                <CardContent className="p-6 text-center text-sm text-slate-500">
-                  You do not have any confirmed or ongoing lesson bookings yet.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {otherTutorBookings.map((booking) => (
-                  <BookingDetails key={booking.id} booking={booking} />
-                ))}
-              </div>
-            )}
-          </section>
+              {unlinkedBookings.map((booking) => (
+                <BookingDetails key={booking.id} booking={booking}>
+                  {booking.status === "PENDING_TUTOR_CONFIRMATION" && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        disabled={bookingActionId === booking.id}
+                        onClick={() => void acceptBooking(booking)}
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Accept lesson
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={bookingActionId === booking.id}
+                        onClick={() => void declineBooking(booking.id)}
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Decline
+                      </Button>
+                    </div>
+                  )}
+                </BookingDetails>
+              ))}
+            </section>
+          )}
         </div>
       </AppShell>
     );
@@ -1566,15 +1854,66 @@ export default function RequestsPage() {
   const isParent = user?.role === "PARENT";
   const accountProfileLabel = isParent ? "parent profile" : "learner profile";
 
-  const filteredSubjects = subjects.filter((subject) =>
+  const availableSubjects = selectedTutor
+    ? subjects.filter((subject) =>
+        selectedTutor.subjects.some((item) => item.id === subject.id),
+      )
+    : subjects;
+
+  const availableModes = selectedTutor
+    ? selectedTutor.tutoring_modes
+    : ["ONLINE", "IN_PERSON", "HYBRID"];
+  const needsPhysicalLocation = mode === "IN_PERSON" || mode === "HYBRID";
+  const filteredSubjects = availableSubjects.filter((subject) =>
     subject.name.toLowerCase().includes(subjectQuery.trim().toLowerCase()),
   );
 
-  const selectedSubject = subjects.find((subject) => subject.id === subjectId);
+  const selectedSubject = availableSubjects.find(
+    (subject) => subject.id === subjectId,
+  );
 
   const selectedBookingRequest = rows.find(
     (request) => request.id === bookingRequest,
   );
+
+  useEffect(() => {
+    if (user?.role === "TUTOR") return;
+    const ids = Array.from(
+      new Set(
+        rows
+          .flatMap((request) => [
+            request.assigned_tutor_id,
+            request.selected_tutor_id,
+          ])
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+    const missing = ids.filter((id) => !tutorProfiles[id]);
+    if (!missing.length) return;
+    let cancelled = false;
+    Promise.all(
+      missing.map(async (id) => {
+        try {
+          const profile = await api<PublicTutor>(
+            `/tutors/${encodeURIComponent(id)}`,
+          );
+          return [id, profile] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      setTutorProfiles((current) => {
+        const next = { ...current };
+        for (const result of results) if (result) next[result[0]] = result[1];
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [rows, user?.role, tutorProfiles]);
 
   return (
     <AppShell
@@ -1632,7 +1971,7 @@ export default function RequestsPage() {
 
                     {selectedTutor.subjects.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {selectedTutor.subjects.slice(0, 4).map((subject) => (
+                        {selectedTutor.subjects.map((subject) => (
                           <span
                             key={subject.id}
                             className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600"
@@ -1640,12 +1979,6 @@ export default function RequestsPage() {
                             {subject.name}
                           </span>
                         ))}
-
-                        {selectedTutor.subjects.length > 4 && (
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
-                            +{selectedTutor.subjects.length - 4} more
-                          </span>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1765,7 +2098,7 @@ export default function RequestsPage() {
 
               <p className="mt-1 text-sm leading-6 text-emerald-900/80">
                 {submittedTutorName
-                  ? `Your request has been sent to ${submittedTutorName}.`
+                  ? `Your direct request has been sent to ${submittedTutorName}. The tutor must accept it before you can schedule a lesson and make payment.`
                   : "Thank you. Your tutoring request has been recorded. You can follow its status in the Your requests section below."}
               </p>
 
@@ -1778,13 +2111,15 @@ export default function RequestsPage() {
                 <p className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
                   {submittedTutorName
-                    ? `${submittedTutorName} can now review and respond to your request.`
+                    ? `${submittedTutorName} must accept your tutoring request before the booking and payment stage becomes available.`
                     : "You can use Find matching tutors to explore suitable tutors while your request is open."}
                 </p>
 
                 <p className="flex items-start gap-2">
-                  <Info className="mt-0.5 h-4 w-4 shrink-0" />A selected tutor
-                  is not assigned until they accept the request.
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                  {submittedTutorName
+                    ? "The selected tutor has been notified and can respond from the tutor dashboard."
+                    : "For generic requests, you choose one tutor from those who express interest."}
                 </p>
               </div>
 
@@ -1832,13 +2167,15 @@ export default function RequestsPage() {
                   autoComplete="off"
                   value={subjectQuery}
                   placeholder="Search subjects or learning areas..."
-                  disabled={subjects.length === 0 || profileStatus !== "ready"}
+                  disabled={
+                    availableSubjects.length === 0 || profileStatus !== "ready"
+                  }
                   onChange={(event) => {
                     const value = event.target.value;
 
                     setSubjectQuery(value);
 
-                    const matchedSubject = subjects.find(
+                    const matchedSubject = availableSubjects.find(
                       (subject) =>
                         subject.name.trim().toLowerCase() ===
                         value.trim().toLowerCase(),
@@ -1867,9 +2204,11 @@ export default function RequestsPage() {
                 </p>
               )}
 
-              {subjects.length === 0 && (
+              {availableSubjects.length === 0 && (
                 <p className="mt-1 text-xs text-amber-700">
-                  No learning areas are currently available.
+                  {selectedTutor
+                    ? "This tutor has not listed any learning areas. You cannot send a direct request until their profile is updated."
+                    : "No learning areas are currently available."}
                 </p>
               )}
             </Field>
@@ -1881,24 +2220,69 @@ export default function RequestsPage() {
                 onChange={(event) => {
                   const nextMode = event.target.value;
                   setMode(nextMode);
+                  setLocationId("");
 
-                  if (nextMode !== "IN_PERSON") {
+                  if (nextMode !== "IN_PERSON" && nextMode !== "HYBRID") {
                     setStateId("");
                     setLgaId("");
                     setCommunityId("");
-                    setLocationId("");
                     setLgas([]);
                     setCommunities([]);
                   }
                 }}
-                disabled={profileStatus !== "ready"}
+                disabled={
+                  profileStatus !== "ready" || availableModes.length === 0
+                }
               >
-                <option value="ONLINE">Online</option>
-                <option value="IN_PERSON">In person</option>
+                {availableModes.map((availableMode) => (
+                  <option key={availableMode} value={availableMode}>
+                    {availableMode === "ONLINE"
+                      ? "Online"
+                      : availableMode === "IN_PERSON"
+                        ? "In person"
+                        : availableMode === "HYBRID"
+                          ? "Hybrid"
+                          : availableMode.replaceAll("_", " ")}
+                  </option>
+                ))}
               </select>
+              {selectedTutor && (
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Showing the tutoring modes offered by{" "}
+                  {getTutorName(selectedTutor)}.
+                </p>
+              )}
             </Field>
 
-            {mode === "IN_PERSON" && (
+            {needsPhysicalLocation && selectedTutor && (
+              <Field
+                label="Tutor's available location"
+                help="Choose one of the locations registered by this tutor."
+              >
+                <select
+                  required
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                  value={locationId}
+                  onChange={(event) => setLocationId(event.target.value)}
+                >
+                  <option value="">Select tutor location</option>
+                  {selectedTutor.locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedTutor.locations.length === 0 && (
+                  <p className="mt-1.5 text-xs text-amber-700">
+                    This tutor has not added a service location. You can choose
+                    Online if the tutor offers it, or contact the tutor after
+                    updating their profile.
+                  </p>
+                )}
+              </Field>
+            )}
+
+            {needsPhysicalLocation && !selectedTutor && (
               <>
                 <Field label="State">
                   <select
@@ -2032,9 +2416,12 @@ export default function RequestsPage() {
                   selectedTutorLoading ||
                   (!!selectedTutorId && !selectedTutor) ||
                   !subjectId ||
+                  (selectedTutor && availableSubjects.length === 0) ||
+                  (selectedTutor && availableModes.length === 0) ||
                   description.trim().length < 10 ||
-                  (mode === "IN_PERSON" &&
-                    (!stateId || !lgaId || !locationId || lgasLoading))
+                  (needsPhysicalLocation &&
+                    (!locationId ||
+                      (!selectedTutor && (!stateId || !lgaId || lgasLoading))))
                 }
               >
                 {busy
@@ -2048,8 +2435,123 @@ export default function RequestsPage() {
         </CardContent>
       </Card>
 
+      {checkoutPreview && (
+        <Card className="mb-6 overflow-hidden border-[#B9E5DF] shadow-[0_16px_45px_rgba(16,42,86,0.08)]">
+          <CardHeader className="bg-[#F0FBF8]">
+            <div className="flex items-start gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white text-[#009B8D] shadow-sm">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-[#102A56]">
+                  Review your payment
+                </CardTitle>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Review the contract amount and Tutova platform charge before
+                  opening Paystack.
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 p-5">
+            {selectedBookingRequest && (
+              <div className="grid gap-3 rounded-xl bg-slate-50 p-3 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-slate-500">Tutor</p>
+                  <p className="mt-1 font-semibold text-slate-800">
+                    {(() => {
+                      const tutorId =
+                        selectedBookingRequest.assigned_tutor_id ||
+                        selectedBookingRequest.selected_tutor_id ||
+                        "";
+                      const tutor = tutorProfiles[tutorId];
+                      return (
+                        tutor?.full_name ||
+                        (tutor
+                          ? `${tutor.first_name} ${tutor.last_name}`
+                          : "Your selected tutor")
+                      );
+                    })()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Proposed lesson</p>
+                  <p className="mt-1 font-semibold text-slate-800">
+                    {startAt
+                      ? new Date(startAt).toLocaleString("en-NG", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })
+                      : "Selected schedule"}{" "}
+                    · {duration} minutes
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-slate-600">
+                  Tutoring contract ({contractMonths}{" "}
+                  {Number(contractMonths) === 1 ? "month" : "months"})
+                </span>
+                <span className="font-semibold text-slate-900">
+                  {money(
+                    checkoutPreview.tutoring_amount_minor,
+                    checkoutPreview.currency,
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-slate-600">Tutova platform charge</span>
+                <span className="font-semibold text-slate-900">
+                  {money(
+                    checkoutPreview.learner_fee_minor,
+                    checkoutPreview.currency,
+                  )}
+                </span>
+              </div>
+              <div className="border-t border-dashed border-slate-200 pt-3">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="font-semibold text-[#102A56]">
+                    Total amount to pay
+                  </span>
+                  <span className="text-xl font-bold tracking-tight text-[#102A56]">
+                    {money(
+                      checkoutPreview.amount_minor,
+                      checkoutPreview.currency,
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs leading-5 text-blue-900">
+              <p className="font-semibold">What happens next?</p>
+              <p className="mt-1">
+                You’ll be taken to Paystack to complete this payment securely.
+                Tutova creates your lesson booking only after Paystack confirms
+                successful payment. Your tutor will then review the paid booking
+                request.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                onClick={continueToPayment}
+                className="min-h-11 px-5"
+              >
+                Continue to secure payment{" "}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <span className="text-xs text-slate-500">
+                Reference: {checkoutPreview.provider_reference}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Booking request form */}
-      {bookingRequest && selectedBookingRequest && (
+      {bookingRequest && selectedBookingRequest && !checkoutPreview && (
         <Card className="mb-6 border-blue-200">
           <CardHeader>
             <CardTitle>Request a lesson session</CardTitle>
@@ -2092,7 +2594,8 @@ export default function RequestsPage() {
 
               {monthlyArrangementId ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-                  This lesson will be added to your existing tutoring contract. You will not be charged for the contract again.
+                  This lesson will be added to your existing tutoring contract.
+                  You will not be charged for the contract again.
                 </div>
               ) : (
                 <Field label="Tutoring contract duration">
@@ -2166,7 +2669,8 @@ export default function RequestsPage() {
         <CardHeader>
           <CardTitle>Your requests</CardTitle>
           <p className="text-sm text-slate-500">
-            Track your tutoring requests and manage lesson booking requests.
+            Follow tutor responses, choose a tutor and track every booking
+            linked to each request.
           </p>
         </CardHeader>
 
@@ -2191,6 +2695,12 @@ export default function RequestsPage() {
                     (booking) => booking.tutoring_request_id === request.id,
                   ),
                 );
+                const hasPendingBooking = requestBookings.some((booking) =>
+                  [
+                    "PENDING_TUTOR_CONFIRMATION",
+                    "PENDING_CONFIRMATION",
+                  ].includes(booking.status),
+                );
 
                 return (
                   <div
@@ -2209,6 +2719,11 @@ export default function RequestsPage() {
                         {request.status === "ACCEPTED" && (
                           <Badge>Tutor accepted</Badge>
                         )}
+
+                        {request.status === "OPEN" &&
+                          request.selected_tutor_response === "DECLINED" && (
+                            <Badge>Tutor declined</Badge>
+                          )}
                       </div>
 
                       <span className="text-xs text-slate-400">
@@ -2221,19 +2736,78 @@ export default function RequestsPage() {
                         {request.subject_name}
                       </p>
                     )}
+                    {user?.role !== "TUTOR" &&
+                      (request.assigned_tutor_id ||
+                        request.selected_tutor_id) &&
+                      (() => {
+                        const tutorId = (request.assigned_tutor_id ||
+                          request.selected_tutor_id) as string;
+                        const tutor = tutorProfiles[tutorId];
+                        return (
+                          <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+                            {tutor?.profile_picture_url ? (
+                              <img
+                                src={tutor.profile_picture_url}
+                                alt={tutor.full_name}
+                                className="h-11 w-11 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                                {tutor
+                                  ? `${tutor.first_name[0]}${tutor.last_name[0]}`.toUpperCase()
+                                  : "T"}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                {request.assigned_tutor_id
+                                  ? "Your assigned tutor"
+                                  : "Tutor selected"}
+                              </p>
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {tutor?.full_name ||
+                                  (tutor
+                                    ? `${tutor.first_name} ${tutor.last_name}`
+                                    : "Loading tutor profile…")}
+                              </p>
+                              {tutor?.monthly_fee != null && (
+                                <p className="text-xs text-slate-500">
+                                  {formatRate(tutor.monthly_fee)} / month
+                                </p>
+                              )}
+                            </div>
+                            {tutor && (
+                              <Link
+                                href={`/tutor/${encodeURIComponent(tutor.id)}`}
+                                className="ml-auto text-xs font-semibold text-[#1769D2]"
+                              >
+                                Profile
+                              </Link>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     <p className="mt-2 text-sm leading-6 text-slate-700">
                       {request.description}
                     </p>
 
                     <p className="mt-2 text-xs text-slate-400">
-                      {request.tutoring_mode.replaceAll("_", " ")} · Request{" "}
-                      {request.id.slice(0, 8)}
+                      {request.tutoring_mode.replaceAll("_", " ")}
                     </p>
 
                     <p className="mt-2 text-xs leading-5 text-slate-500">
                       {getRequestStatusDescription(request)}
                     </p>
+
+                    {request.status === "OPEN" &&
+                      request.selected_tutor_response === "DECLINED" && (
+                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                          Your selected tutor declined this request. You can
+                          cancel it and submit a new request to choose another
+                          tutor.
+                        </div>
+                      )}
 
                     {request.preferred_schedule && (
                       <p className="mt-1 text-xs text-slate-500">
@@ -2243,51 +2817,56 @@ export default function RequestsPage() {
 
                     {request.status === "OPEN" && (
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={
-                            matchingLoading && matchingRequestId === request.id
-                          }
-                          onClick={() => void findMatchingTutors(request.id)}
-                        >
-                          {matchingLoading && matchingRequestId === request.id
-                            ? "Finding tutors…"
-                            : matchingRequestId === request.id
-                              ? "Hide matching tutors"
-                              : "Find matching tutors"}
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={cancellingRequestId === request.id}
-                          onClick={() => void cancelRequest(request)}
-                          className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                        >
-                          {cancellingRequestId === request.id ? (
-                            "Cancelling…"
-                          ) : (
-                            <>
-                              <Ban className="mr-2 h-4 w-4" />
-                              Cancel request
-                            </>
-                          )}
-                        </Button>
+                        {!request.selected_tutor_id && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={
+                              matchingLoading &&
+                              matchingRequestId === request.id
+                            }
+                            onClick={() => void findMatchingTutors(request.id)}
+                          >
+                            {matchingLoading && matchingRequestId === request.id
+                              ? "Finding tutors…"
+                              : matchingRequestId === request.id
+                                ? "Hide matching tutors"
+                                : "Find matching tutors"}
+                          </Button>
+                        )}
+                        {!hasPendingBooking && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={cancellingRequestId === request.id}
+                            onClick={() => void cancelRequest(request)}
+                            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          >
+                            {cancellingRequestId === request.id ? (
+                              "Cancelling…"
+                            ) : (
+                              <>
+                                <Ban className="mr-2 h-4 w-4" />
+                                Cancel request
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     )}
 
-                    {request.status === "ACCEPTED" && (
+                    {request.status === "ACCEPTED" && !hasPendingBooking && (
                       <div className="mt-4 rounded-lg bg-emerald-50 px-3 py-3">
                         <div className="flex items-start gap-2 text-sm text-emerald-800">
                           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
                           <div>
                             <p className="font-medium">
-                              Your tutoring request has been accepted.
+                              The tutor has accepted your tutoring request.
                             </p>
                             <p className="mt-1 text-xs leading-5">
-                              You can now request a lesson session. The tutor
-                              will review your preferred date and time.
+                              You can now propose the exact lesson date and time
+                              and pay through Tutova. The tutor will review the
+                              paid booking before the agreement is prepared.
                             </p>
                           </div>
                         </div>
@@ -2296,10 +2875,12 @@ export default function RequestsPage() {
                           type="button"
                           className="mt-3"
                           onClick={() => {
-                            const existingArrangement = requestBookings.find(
-                              (item) => Boolean(item.monthly_arrangement_id),
-                            )?.monthly_arrangement_id ?? null;
+                            const existingArrangement =
+                              requestBookings.find((item) =>
+                                Boolean(item.monthly_arrangement_id),
+                              )?.monthly_arrangement_id ?? null;
                             setMonthlyArrangementId(existingArrangement);
+                            setCheckoutPreview(null);
                             setBookingRequest(request.id);
                             setStartAt("");
                             setDuration("60");
@@ -2340,21 +2921,14 @@ export default function RequestsPage() {
                               {booking.status === "PENDING_CONFIRMATION" && (
                                 <div className="mt-4 border-t border-slate-100 pt-3">
                                   <p className="mb-3 text-xs leading-5 text-amber-800">
-                                    This is a booking created under the previous
-                                    booking workflow.
+                                    The tutor has accepted the proposed lesson.
+                                    Review the tutoring agreement and approve
+                                    its terms before the booking is confirmed.
                                   </p>
-
-                                  <Button
-                                    type="button"
-                                    disabled={bookingActionId === booking.id}
-                                    onClick={() =>
-                                      void confirmLegacyBooking(booking.id)
-                                    }
-                                  >
-                                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                                    {bookingActionId === booking.id
-                                      ? "Please wait…"
-                                      : "Confirm legacy booking"}
+                                  <Button asChild size="sm">
+                                    <Link href="/agreements">
+                                      Review tutoring agreement
+                                    </Link>
                                   </Button>
                                 </div>
                               )}
@@ -2440,13 +3014,33 @@ export default function RequestsPage() {
                                 className="rounded-xl border border-slate-200 p-4"
                               >
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                  <div>
-                                    <h4 className="font-semibold text-slate-900">
-                                      {tutor.first_name} {tutor.last_name}
-                                    </h4>
-                                    <p className="mt-1 text-sm font-medium text-slate-700">
-                                      {formatRate(tutor.monthly_fee)}
-                                    </p>
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    {tutor.profile_picture_url ? (
+                                      <img
+                                        src={tutor.profile_picture_url}
+                                        alt={`${tutor.first_name} ${tutor.last_name}`}
+                                        className="h-14 w-14 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-sm"
+                                      />
+                                    ) : (
+                                      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-blue-50 text-lg font-bold text-[#1769D2]">
+                                        {`${tutor.first_name?.[0] ?? ""}${tutor.last_name?.[0] ?? ""}`.toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div className="min-w-0">
+                                      <h4 className="truncate font-semibold text-slate-900">
+                                        {tutor.first_name} {tutor.last_name}
+                                      </h4>
+                                      <p className="mt-1 text-sm font-medium text-slate-700">
+                                        {formatRate(tutor.monthly_fee)}
+                                      </p>
+                                      <p className="mt-0.5 text-xs text-slate-500">
+                                        {tutor.years_of_experience}{" "}
+                                        {tutor.years_of_experience === 1
+                                          ? "year"
+                                          : "years"}{" "}
+                                        teaching experience
+                                      </p>
+                                    </div>
                                   </div>
 
                                   <Badge>
@@ -2587,6 +3181,34 @@ export default function RequestsPage() {
                                       .join(", ")}
                                   </p>
                                 )}
+                                {request.status === "OPEN" &&
+                                  !request.selected_tutor_id &&
+                                  tutor.response_decision === "ACCEPTED" && (
+                                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-emerald-50 p-3">
+                                      <p className="text-sm text-emerald-800">
+                                        This tutor is interested in your
+                                        request.
+                                      </p>
+                                      <Button
+                                        size="sm"
+                                        disabled={busy}
+                                        onClick={() =>
+                                          void selectRespondingTutor(
+                                            request.id,
+                                            tutor,
+                                          )
+                                        }
+                                      >
+                                        Select this tutor
+                                      </Button>
+                                    </div>
+                                  )}
+                                {request.selected_tutor_id &&
+                                  tutor.response_decision === "ACCEPTED" && (
+                                    <p className="mt-3 text-xs font-medium text-emerald-700">
+                                      Selected tutor response
+                                    </p>
+                                  )}
                               </div>
                             ))}
                           </div>

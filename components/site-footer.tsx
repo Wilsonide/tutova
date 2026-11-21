@@ -1,5 +1,9 @@
 import Link from "next/link";
 
+const CONTACT_NUMBER = "+2347010163875";
+const WHATSAPP_URL =
+  "https://wa.me/2347010163875?text=Hello%20Tutova%2C%20I%20would%20like%20to%20make%20an%20enquiry.";
+
 const socialLinks = [
   {
     name: "Instagram",
@@ -133,6 +137,63 @@ export function SiteFooter() {
             <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-[#00AFA0]">
               The right tutor. A brighter future.
             </p>
+
+            {/* Contact information */}
+            <div className="mt-6 space-y-3">
+              <a
+                href={`tel:${CONTACT_NUMBER}`}
+                className="group inline-flex items-center gap-3 text-sm text-blue-100/75 transition hover:text-[#65DED0]"
+                aria-label="Call Tutova"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] transition group-hover:border-[#00AFA0]/40 group-hover:bg-[#00AFA0]/10">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                  >
+                    <path
+                      d="M5 3h3l2 5-2 1.5a14 14 0 0 0 6.5 6.5L18 14l3 3v3c0 1.1-.9 2-2 2C10.6 21 3 13.4 3 5c0-1.1.9-2 2-2Z"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span>
+                  <span className="block text-xs text-blue-100/45">
+                    Call us
+                  </span>
+                  <span className="font-semibold">+234 701 016 3875</span>
+                </span>
+              </a>
+
+              <a
+                href={WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Chat with Tutova on WhatsApp"
+                className="group inline-flex items-center gap-3 text-sm text-blue-100/75 transition hover:text-[#65DED0]"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] transition group-hover:border-[#00AFA0]/40 group-hover:bg-[#00AFA0]/10">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="h-[18px] w-[18px]"
+                  >
+                    <path d="M20.5 3.5A11.8 11.8 0 0 0 12.1 0C5.6 0 .3 5.3.3 11.8c0 2.1.6 4.2 1.6 6L0 24l6.4-1.7a11.8 11.8 0 0 0 5.7 1.5h.1c6.5 0 11.8-5.3 11.8-11.8 0-3.2-1.2-6.2-3.5-8.5ZM12.1 21.8a9.9 9.9 0 0 1-5-1.4l-.4-.2-3.8 1 1-3.7-.3-.4a9.8 9.8 0 0 1-1.5-5.3c0-5.5 4.5-10 10-10 2.7 0 5.2 1 7.1 2.9a9.9 9.9 0 0 1 2.9 7.1c0 5.5-4.5 10-10 10Zm5.5-7.5c-.3-.2-1.7-.9-2-1s-.5-.2-.7.2-.8 1-.9 1.2-.3.2-.6.1a8 8 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2.1c-.2-.3 0-.5.1-.6l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.4 0-.6s-.7-1.7-1-2.3c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4s-1.2 1.2-1.2 2.8 1.2 3.2 1.4 3.4c.2.2 2.4 3.7 5.8 5.1.8.3 1.4.5 1.9.6.8.3 1.6.2 2.2.1.7-.1 1.7-.7 1.9-1.4.2-.7.2-1.3.1-1.4-.1-.2-.3-.3-.6-.5Z" />
+                  </svg>
+                </span>
+                <span>
+                  <span className="block text-xs text-blue-100/45">
+                    Chat with us
+                  </span>
+                  <span className="font-semibold">WhatsApp Tutova</span>
+                </span>
+              </a>
+            </div>
           </div>
 
           {/* Navigation groups */}

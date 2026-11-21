@@ -22,6 +22,7 @@ export type TutorProfile = {
   id: string;
   user_id: string;
   bio: string | null;
+  profile_picture_url?: string | null;
   monthly_fee: number | null;
   qualifications: string | null;
   years_of_experience: number;
@@ -60,10 +61,10 @@ export type Learner = {
 export type TutoringRequest = {
   id: string;
   requester_user_id: string;
-  learner_profile_id: string;
+  learner_profile_id: string | null;
   subject_id: string;
   location_id: string | null;
-  tutoring_mode: "ONLINE" | "IN_PERSON";
+  tutoring_mode: "ONLINE" | "IN_PERSON" | "HYBRID";
   description: string;
   preferred_schedule: string | null;
   status: string;
