@@ -2502,7 +2502,7 @@ export default function RequestsPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4 text-sm">
-                <span className="text-slate-600">Tutova platform charge</span>
+                <span className="text-slate-600">Tutova platform charge (5%)</span>
                 <span className="font-semibold text-slate-900">
                   {money(
                     checkoutPreview.learner_fee_minor,

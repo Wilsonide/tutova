@@ -295,6 +295,8 @@ export default function DiscoverPage() {
 
   const [loading, setLoading] = useState(true);
 
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
+
   const [error, setError] = useState("");
 
   // Match the user's input against the subjects returned by the backend.
@@ -326,6 +328,26 @@ export default function DiscoverPage() {
         setSubjects(subjectData);
 
         setStates(stateData);
+
+        // A subject card links to /discover?subject_id=<id>. Restore that
+        // selection before the first tutor request so we never briefly show
+        // unfiltered results.
+        const requestedSubjectId = new URLSearchParams(
+          window.location.search,
+        ).get("subject_id");
+
+        if (requestedSubjectId) {
+          const requestedSubject = subjectData.find(
+            (subject) => subject.id === requestedSubjectId,
+          );
+
+          if (requestedSubject) {
+            setSubjectId(requestedSubject.id);
+            setSubjectSearch(requestedSubject.name);
+          }
+        }
+
+        setFiltersInitialized(true);
       })
 
       .catch((err) => {
@@ -335,6 +357,9 @@ export default function DiscoverPage() {
               ? err.message
               : "Could not load discovery filters",
           );
+          // Do not leave the discovery page permanently blocked if catalog
+          // loading fails. The tutor endpoint can still return unfiltered data.
+          setFiltersInitialized(true);
         }
       });
 
@@ -382,10 +407,28 @@ export default function DiscoverPage() {
 
   // Select a subject from the search suggestions.
 
+  const updateSubjectQuery = (nextSubjectId: string) => {
+    const url = new URL(window.location.href);
+
+    if (nextSubjectId) {
+      url.searchParams.set("subject_id", nextSubjectId);
+    } else {
+      url.searchParams.delete("subject_id");
+    }
+
+    window.history.replaceState(
+      {},
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  };
+
   const handleSubjectSelect = (subject: Subject) => {
     setSubjectSearch(subject.name);
 
     setSubjectId(subject.id);
+
+    updateSubjectQuery(subject.id);
 
     setShowSubjectSuggestions(false);
 
@@ -406,6 +449,8 @@ export default function DiscoverPage() {
     );
 
     setSubjectId(exactMatch?.id ?? "");
+
+    updateSubjectQuery(exactMatch?.id ?? "");
   };
 
   // Clear only the learning area selection.
@@ -414,6 +459,8 @@ export default function DiscoverPage() {
     setSubjectSearch("");
 
     setSubjectId("");
+
+    updateSubjectQuery("");
 
     setShowSubjectSuggestions(false);
 
@@ -482,13 +529,17 @@ export default function DiscoverPage() {
   }, [page, subjectId, stateId, lgaId, tutoringMode]);
 
   useEffect(() => {
+    if (!filtersInitialized) return;
+
     fetchTutors();
-  }, [fetchTutors]);
+  }, [fetchTutors, filtersInitialized]);
 
   const clearFilters = () => {
     setSubjectSearch("");
 
     setSubjectId("");
+
+    updateSubjectQuery("");
 
     setStateId("");
 
@@ -670,6 +721,8 @@ export default function DiscoverPage() {
                       );
 
                       setSubjectId(e.target.value);
+
+                      updateSubjectQuery(e.target.value);
 
                       setSubjectSearch(selectedSubject?.name ?? "");
 

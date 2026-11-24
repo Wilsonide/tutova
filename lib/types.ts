@@ -93,5 +93,9 @@ export type Booking = {
   updated_at: string;
   tutor_completed_at: string | null;
   learner_acknowledged_at: string | null;
+  tutor_name?: string | null;
+  tutor_profile_picture_url?: string | null;
+  requester_name?: string | null;
+  subject_name?: string | null;
 };
 export type ApiError = { detail?: string | { msg?: string }[] };

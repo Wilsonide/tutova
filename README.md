@@ -12,7 +12,10 @@ npm install
 Copy-Item .env.example .env.local
 npm run dev
 ```
-Set `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env.local`, then open `http://localhost:3000`.
+Configure `NEXT_PUBLIC_API_URL` (the API origin, without `/api/v1`) and
+`NEXT_PUBLIC_APP_URL` in `.env.local` for local development or in your hosting
+provider's environment settings for production. Production builds do not fall
+back to a hardcoded localhost API URL.
 
 ## Brand
 - Deep navy: `#102A56`
@@ -25,13 +28,15 @@ Set `NEXT_PUBLIC_API_URL=http://localhost:8000` in `.env.local`, then open `http
 - `/` landing page
 - `/login`, `/register` authentication
 - `/discover` public tutor discovery
-- `/dashboard` role-aware workspace
+- `/dashboard` role-aware workspace with clickable overview cards
+- `/notifications` paginated notification centre with mark-read and mark-all-read actions
 - `/requests` request list/create/respond
 - `/agreements` create/accept agreements
 - `/lessons` scheduling and delivery recording
 - `/progress` progress report submission
 - `/payments` Paystack checkout initiation and provider-side verification
-- `/payment-status` payment return/status view (verification requires obligation and attempt IDs in query params)
+- `/payment/callback` Paystack return page; payment success is shown only after backend verification returns `PAID`
+- `/payment-status` secondary payment status view
 - `/earnings` tutor earnings and payout request
 - `/tutor/onboarding` application, profile, verification reference, NDA and intro-video submission
 - `/tutor/manage` offerings, pricing proposals and availability
@@ -45,8 +50,22 @@ The backend issues a short-lived bearer access token and rotates a refresh token
 ## Payments
 The frontend never calls Paystack directly with a secret key. It asks the backend to initialize a payment, follows the returned checkout URL, and can call the backend's verification endpoint. The backend remains responsible for webhook signature checks, server-to-server provider verification, idempotency, payment state and ledger/earning reconciliation. Configure `PAYMENT_PROVIDER=PAYSTACK`, `PAYSTACK_SECRET_KEY`, and a valid callback URL on the backend.
 
-## Known backend API gaps (important)
-This frontend deliberately does not fake data where the supplied API has no read endpoint. The uploaded backend has write actions for agreements, lessons and progress reports, but no list/detail endpoints for those records; similarly it lacks payment obligation history, payout history/settlement state, and list queues for verification records, videos, pricing proposals and payout requests. Some pages therefore ask for a known record UUID and submit supported actions. For a seamless production UX, add authenticated GET endpoints for these resources (with role-scoped filtering) and then connect the screens to them. The backend also accepts storage keys for verification documents and videos rather than receiving file uploads; configure a private storage adapter and signed upload URLs before exposing sensitive file uploads to users.
+## Launch configuration
+
+- Set `NEXT_PUBLIC_API_URL` to the deployed FastAPI origin (for example,
+  `https://api.example.com`) and `NEXT_PUBLIC_APP_URL` to the deployed frontend
+  origin. These are public deployment URLs, not secrets.
+- Configure the backend `PAYSTACK_CALLBACK_URL` to the deployed frontend's
+  `/payment/callback` route and `FRONTEND_BASE_URL` to the same frontend origin.
+  Paystack checkout redirects are supplied by the backend environment
+  configuration; the frontend follows only the checkout URL returned by Paystack.
+- Keep `.env.local` out of source control and do not expose backend secrets through
+  `NEXT_PUBLIC_*` variables.
+- The dashboard notification count and `/notifications` page use the backend's
+  existing paginated notification endpoints. Booking and tutor-response email
+  delivery also requires valid SMTP configuration on the backend.
+- The lessons and payment-history pages use batched backend display fields rather
+  than issuing one tutor-profile request for every row.
 
 ## shadcn/ui
 `components.json` is configured for shadcn CLI with root aliases. The project includes local button, card, input, textarea, label, badge and field components using shadcn's component pattern. Add more components with e.g. `npx shadcn@latest add dialog dropdown-menu table form`.

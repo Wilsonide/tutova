@@ -21,14 +21,8 @@ type Payment = {
   status: string;
   created_at: string;
   paid_at: string | null;
-};
-
-type Tutor = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  full_name: string;
-  profile_picture_url: string | null;
+  tutor_name?: string | null;
+  tutor_profile_picture_url?: string | null;
 };
 
 function statusStyle(status: string) {
@@ -42,7 +36,6 @@ function statusStyle(status: string) {
 
 export default function PaymentsPage() {
   const [rows, setRows] = useState<Payment[]>([]);
-  const [tutors, setTutors] = useState<Record<string, Tutor>>({});
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -50,14 +43,6 @@ export default function PaymentsPage() {
     try {
       const payments = await api<Payment[]>("/payments/mine");
       setRows(payments);
-      const ids = Array.from(new Set(payments.map((payment) => payment.tutor_profile_id).filter(Boolean)));
-      const profiles = await Promise.all(ids.map(async (id) => {
-        try { return await api<Tutor>(`/tutors/${encodeURIComponent(id)}`); }
-        catch { return null; }
-      }));
-      const next: Record<string, Tutor> = {};
-      profiles.forEach((profile) => { if (profile) next[profile.id] = profile; });
-      setTutors(next);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not load payments");
     } finally {
@@ -95,14 +80,21 @@ export default function PaymentsPage() {
           ) : (
             <div className="space-y-3">
               {rows.map((payment) => {
-                const tutor = tutors[payment.tutor_profile_id];
-                const name = tutor?.full_name || (tutor ? `${tutor.first_name} ${tutor.last_name}` : "Tutova tutor");
+                const name = payment.tutor_name || "Tutova tutor";
                 const initials = name.split(" ").filter(Boolean).slice(0,2).map((part) => part[0]).join("").toUpperCase();
                 return (
                   <article key={payment.id} className="app-card-hover rounded-2xl border border-slate-100 p-4 sm:p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        {tutor?.profile_picture_url ? <img src={tutor.profile_picture_url} alt={name} className="h-12 w-12 rounded-full object-cover" /> : <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-sm font-bold text-[#1769D2]">{initials || "T"}</div>}
+                        {payment.tutor_profile_picture_url ? (
+                          <img
+                            src={payment.tutor_profile_picture_url}
+                            alt={name}
+                            className="h-12 w-12 shrink-0 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-sm font-bold text-[#1769D2]">{initials || "T"}</div>
+                        )}
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-[#102A56]">{name}</p>
                           <p className="mt-0.5 text-xs text-slate-500">{new Date(payment.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })} · Ref {payment.provider_reference}</p>

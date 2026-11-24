@@ -10,7 +10,7 @@ type VerificationResponse = {
   status?: string;
 };
 
-type VerificationState = "VERIFYING" | "SUCCESS" | "FAILED";
+type VerificationState = "VERIFYING" | "SUCCESS" | "FAILED" | "PENDING";
 
 function PaymentCallbackContent() {
   const searchParams = useSearchParams();
@@ -46,10 +46,23 @@ function PaymentCallbackContent() {
           },
         );
 
-        setState("SUCCESS");
-        setMessage(
-          result?.message || "Your payment has been verified successfully.",
-        );
+        const verifiedStatus = String(result?.status || "").toUpperCase();
+        if (verifiedStatus === "PAID") {
+          setState("SUCCESS");
+          setMessage(
+            result?.message || "Your payment has been verified successfully.",
+          );
+        } else if (verifiedStatus === "FAILED") {
+          setState("FAILED");
+          setMessage(
+            "The payment provider reported that this transaction failed. You can review the payment centre for the latest status.",
+          );
+        } else {
+          setState("PENDING");
+          setMessage(
+            "Your payment is not confirmed yet. Tutova will only create the booking after the payment provider confirms the transaction.",
+          );
+        }
       } catch (error) {
         console.error("Payment verification failed:", error);
 
@@ -106,14 +119,20 @@ function PaymentCallbackContent() {
           </>
         )}
 
-        {state === "FAILED" && (
+        {(state === "FAILED" || state === "PENDING") && (
           <>
-            <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-2xl text-red-600">
-              !
+            <div className={`mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full text-2xl ${
+              state === "PENDING"
+                ? "bg-amber-100 text-amber-700"
+                : "bg-red-100 text-red-600"
+            }`}>
+              {state === "PENDING" ? "…" : "!"}
             </div>
 
             <h1 className="text-xl font-semibold text-slate-900">
-              Payment verification unsuccessful
+              {state === "PENDING"
+                ? "Payment confirmation pending"
+                : "Payment verification unsuccessful"}
             </h1>
 
             <p className="mt-3 text-sm text-slate-600">{message}</p>

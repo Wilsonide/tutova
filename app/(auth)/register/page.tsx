@@ -12,6 +12,8 @@ import {
   GraduationCap,
   UserRound,
   Users,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -37,10 +39,10 @@ function getSafeNextPath(value: string | null): string | null {
 
 export default function RegisterPage() {
   const [accountType, setAccountType] = useState<AccountType>("PARENT");
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Preserve the destination supplied through the login/register journey.
@@ -56,7 +58,6 @@ export default function RegisterPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedDestination = params.get("next");
-
     setNextPath(getSafeNextPath(requestedDestination));
   }, []);
 
@@ -108,7 +109,6 @@ export default function RegisterPage() {
         );
 
         await signIn(trimmedEmail, password);
-
         setAccountCreated(true);
       }
 
@@ -267,10 +267,12 @@ export default function RegisterPage() {
                 size={20}
                 className="mt-0.5 shrink-0 text-[#1769D2]"
               />
+
               <div>
                 <p className="text-sm font-bold text-[#102A56]">
                   Continue with your tutoring request
                 </p>
+
                 <p className="mt-1 text-xs leading-5 text-slate-600">
                   After creating your account, you'll return to your tutoring
                   request.
@@ -362,23 +364,38 @@ export default function RegisterPage() {
               />
             </Field>
 
+            {/* Password with show/hide toggle */}
             <Field
               label="Create password"
               htmlFor="password"
               help="At least 8 characters. Choose a unique password."
             >
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                maxLength={128}
-                autoComplete="new-password"
-                value={password}
-                disabled={busy || accountCreated}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="8+ characters"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  value={password}
+                  disabled={busy || accountCreated}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="8+ characters"
+                  className="pr-12"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  disabled={busy || accountCreated}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-3 flex items-center justify-center text-slate-500 transition-colors hover:text-[#102A56] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                </button>
+              </div>
             </Field>
 
             {accountCreated && (

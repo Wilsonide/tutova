@@ -20,6 +20,7 @@ import {
   GraduationCap,
   ClipboardCheck,
   FileText,
+  Bell,
   ChevronRight,
 } from "lucide-react";
 
@@ -30,15 +31,17 @@ import { toast } from "sonner";
 
 const learnerNav = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/requests", label: "Requests", icon: Users },
   { href: "/lessons", label: "Lessons", icon: CalendarDays },
   { href: "/agreements", label: "Agreements", icon: FileText },
-  { href: "/progress", label: "Learning progress", icon: ChartNoAxesColumn },
+  { href: "/progress", label: "Daily learning log", icon: ChartNoAxesColumn },
   { href: "/payments", label: "Payments", icon: Wallet },
 ];
 
 const tutorNav = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   {
     href: "/tutor/manage",
     label: "My teaching profile",
@@ -52,14 +55,15 @@ const tutorNav = [
   { href: "/requests", label: "Requests", icon: Users },
   { href: "/lessons", label: "Lessons", icon: CalendarDays },
   { href: "/agreements", label: "Agreements", icon: FileText },
-  { href: "/progress", label: "Progress reports", icon: ChartNoAxesColumn },
+  { href: "/progress", label: "Daily learning log", icon: ChartNoAxesColumn },
   { href: "/earnings", label: "Earnings & payouts", icon: Wallet },
 ];
 
 const adminNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/requests", label: "Tutoring requests", icon: Users },
-  { href: "/admin/progress", label: "Progress reports", icon: ChartNoAxesColumn },
+  { href: "/admin/progress", label: "Progress oversight", icon: ChartNoAxesColumn },
   { href: "/agreements", label: "Agreements", icon: FileText },
   {
     href: "/safeguarding",

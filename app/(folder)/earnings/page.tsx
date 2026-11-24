@@ -135,11 +135,11 @@ export default function EarningsPage() {
         <CardContent className="space-y-2 text-sm text-slate-600">
           <p>The commission rate is based on the date an administrator approves your tutor verification. It is calculated monthly against your gross tutoring earnings.</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">First month</p><p>25% total · 12.5% tutor · 12.5% learner</p></div>
-            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">After 1 month, before 3 months</p><p>20% total · 10% tutor · 10% learner</p></div>
-            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">From 3 months</p><p>15% total · 7.5% tutor · 7.5% learner</p></div>
+            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">New tutor · first month</p><p>20% total · 15% tutor · 5% parent</p></div>
+            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">Relatively new · after 1 month, before 3 months</p><p>15% total · 10% tutor · 5% parent</p></div>
+            <div className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-[#102A56]">Returning · from 3 months</p><p>10% total · 5% tutor · 5% parent</p></div>
           </div>
-          <p>The learner pays the other half as an additional platform fee. Your displayed earnings are after your contribution. The 15% rate begins on the exact three-month approval anniversary.</p>
+          <p>The parent or adult learner always pays a flat 5% platform fee on top of the agreed tutoring amount. You contribute the remaining commission from your agreed tutoring earnings. Your displayed earnings are after your contribution. The 10% rate begins on the exact three-month approval anniversary.</p>
         </CardContent>
       </Card>
 

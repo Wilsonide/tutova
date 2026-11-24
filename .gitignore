@@ -5,3 +5,7 @@ build
 .env.local
 .env.*.local
 *.tsbuildinfo
+
+.env
+.env.*
+!.env.example

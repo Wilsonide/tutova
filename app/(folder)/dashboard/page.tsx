@@ -12,7 +12,6 @@ import {
   Wallet,
   BookOpen,
   Users,
-  UserPlus,
   Pencil,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -126,76 +125,71 @@ export default function DashboardPage() {
 
     async function loadDashboard() {
       setLoading(true);
+      if (isParent) setChildrenLoading(true);
 
-      if (isParent) {
-        setChildrenLoading(true);
-      }
-
-      const dashboardRequests: [
-        Promise<TutoringRequest[]>,
-        Promise<Booking[]>,
-        Promise<NotificationSummary>,
-      ] = [
+      const tasks = [
         api<TutoringRequest[]>(
           isTutor ? "/tutoring-requests/matching" : "/tutoring-requests/mine",
         ),
         api<Booking[]>("/session-bookings/mine?limit=10"),
         api<NotificationSummary>("/notifications?limit=1"),
-      ];
+        isTutor
+          ? api<TutorEarningsSummary>("/payments/earnings/summary")
+          : Promise.resolve(null),
+        isParent
+          ? api<ChildLearner[]>("/parents/learners")
+          : Promise.resolve(null),
+      ] as const;
 
-      const results = await Promise.allSettled(dashboardRequests);
-
+      const results = await Promise.allSettled(tasks);
       if (!active) return;
 
-      if (results[0].status === "fulfilled") {
-        setRequests(results[0].value);
+      const [requestResult, bookingResult, notificationResult, earningsResult, childrenResult] =
+        results;
+
+      if (requestResult.status === "fulfilled") {
+        setRequests(requestResult.value);
+      }
+      if (bookingResult.status === "fulfilled") {
+        setBookings(bookingResult.value);
+      }
+      if (notificationResult.status === "fulfilled") {
+        setUnread(notificationResult.value.unread_count || 0);
+      }
+      if (
+        isTutor &&
+        earningsResult.status === "fulfilled" &&
+        earningsResult.value
+      ) {
+        setEarnings(earningsResult.value);
+      }
+      if (
+        isParent &&
+        childrenResult.status === "fulfilled" &&
+        childrenResult.value
+      ) {
+        setChildren(childrenResult.value);
       }
 
-      if (results[1].status === "fulfilled") {
-        setBookings(results[1].value);
-      }
-
-      if (results[2].status === "fulfilled") {
-        setUnread(results[2].value.unread_count || 0);
-      }
-
-      if (isTutor) {
-        try {
-          const earningsSummary = await api<TutorEarningsSummary>("/payments/earnings/summary");
-          if (active) setEarnings(earningsSummary);
-        } catch {
-          if (active) toast.error("Tutor earnings summary could not be loaded.");
-        }
-      }
-
-      if (results.every((result) => result.status === "rejected")) {
+      const coreResults = [requestResult, bookingResult, notificationResult];
+      if (coreResults.every((result) => result.status === "rejected")) {
         toast.error("Dashboard information could not be loaded.");
-      } else if (results.some((result) => result.status === "rejected")) {
+      } else if (coreResults.some((result) => result.status === "rejected")) {
         toast.error("Some dashboard information could not be loaded.");
       }
 
-      setLoading(false);
-
-      if (isParent) {
-        try {
-          const parentChildren = await api<ChildLearner[]>("/parents/learners");
-
-          if (active) {
-            setChildren(parentChildren);
-          }
-        } catch {
-          if (active) {
-            toast.error("Your children could not be loaded.");
-          }
-        } finally {
-          if (active) {
-            setChildrenLoading(false);
-          }
-        }
+      if (isTutor && earningsResult.status === "rejected") {
+        toast.error("Tutor earnings summary could not be loaded.");
       }
+      if (isParent && childrenResult.status === "rejected") {
+        toast.error("Your children could not be loaded.");
+      }
+
+      setLoading(false);
+      setChildrenLoading(false);
     }
 
-    loadDashboard();
+    void loadDashboard();
 
     return () => {
       active = false;
@@ -279,16 +273,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
 
-                <Button
-                  asChild
-                  size="sm"
-                  className="shrink-0 bg-[#1769D2] hover:bg-[#1258B5]"
-                >
-                  <Link href="/children">
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Add child
-                  </Link>
-                </Button>
               </CardHeader>
 
               <CardContent>
@@ -367,20 +351,9 @@ export default function DashboardPage() {
                     </p>
 
                     <p className="mt-1 max-w-sm text-sm leading-6 text-slate-500">
-                      Add your child's profile to help organise their tutoring
-                      requests, lessons and learning activities.
+                      Learner profiles linked to your account will appear here.
+                      You can review existing profiles and their tutoring activity from this section.
                     </p>
-
-                    <Button
-                      asChild
-                      size="sm"
-                      className="mt-4 bg-[#1769D2] hover:bg-[#1258B5]"
-                    >
-                      <Link href="/children">
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Add your first child
-                      </Link>
-                    </Button>
                   </div>
                 )}
 
@@ -404,83 +377,113 @@ export default function DashboardPage() {
           </div>
 
           <div className={`grid gap-4 sm:grid-cols-2 ${isTutor ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
-            <Card className="border-slate-200/80 shadow-sm">
-              <CardContent className="flex items-center justify-between p-5">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    {requestLabel}
-                  </p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
-                    {loading ? "—" : requests.length}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {isTutor ? "Opportunities available" : "Submitted requests"}
-                  </p>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-[#1769D2]">
-                  <BookOpen className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200/80 shadow-sm">
-              <CardContent className="flex items-center justify-between p-5">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Bookings</p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
-                    {loading ? "—" : bookings.length}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {isTutor ? "Scheduled sessions" : "Learning sessions"}
-                  </p>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-50 text-[#00A99A]">
-                  <CalendarDays className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {isTutor && (
-              <Card className="border-slate-200/80 shadow-sm">
-                <CardContent className="flex items-center justify-between p-5">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">This month's earnings</p>
-                    <p className="mt-2 text-2xl font-bold tracking-tight text-[#00A99A]">
-                      {loading ? "—" : money(earnings?.current_month_earnings_minor ?? 0, earnings?.currency ?? "NGN")}
+            <Link
+              href="/requests"
+              aria-label={`View ${requestLabel}`}
+              className="group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1769D2] focus-visible:ring-offset-2"
+            >
+              <Card className="h-full border-slate-200/80 shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-blue-200 group-hover:shadow-md">
+                <CardContent className="flex h-full items-start justify-between gap-3 p-5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-500">{requestLabel}</p>
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
+                      {loading ? "—" : requests.length}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      {money(earnings?.held_tutor_earnings_minor ?? 0, earnings?.currency ?? "NGN")} held by Tutova
+                      {isTutor ? "Opportunities available" : "Submitted requests"}
                     </p>
-                    <Link href="/earnings" className="mt-2 inline-block text-xs font-semibold text-[#1769D2]">View earnings and payouts</Link>
+                    <span className="mt-4 inline-flex items-center text-xs font-semibold text-[#1769D2]">
+                      View requests
+                      <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                    </span>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                    <Wallet className="h-5 w-5" />
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1769D2]">
+                    <BookOpen className="h-5 w-5" />
                   </div>
                 </CardContent>
               </Card>
+            </Link>
+
+            <Link
+              href="/lessons"
+              aria-label="View bookings and lessons"
+              className="group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1769D2] focus-visible:ring-offset-2"
+            >
+              <Card className="h-full border-slate-200/80 shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-teal-200 group-hover:shadow-md">
+                <CardContent className="flex h-full items-start justify-between gap-3 p-5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-500">Bookings</p>
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
+                      {loading ? "—" : bookings.length}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {isTutor ? "Scheduled sessions" : "Learning sessions"}
+                    </p>
+                    <span className="mt-4 inline-flex items-center text-xs font-semibold text-[#1769D2]">
+                      View lessons
+                      <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                    </span>
+                  </div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-[#00A99A]">
+                    <CalendarDays className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {isTutor && (
+              <Link
+                href="/earnings"
+                aria-label="View earnings and payouts"
+                className="group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1769D2] focus-visible:ring-offset-2"
+              >
+                <Card className="h-full border-slate-200/80 shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-emerald-200 group-hover:shadow-md">
+                  <CardContent className="flex h-full items-start justify-between gap-3 p-5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-500">This month's earnings</p>
+                      <p className="mt-2 break-words text-2xl font-bold tracking-tight text-[#00AFA0]">
+                        {loading ? "—" : money(earnings?.current_month_earnings_minor ?? 0, earnings?.currency ?? "NGN")}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {money(earnings?.held_tutor_earnings_minor ?? 0, earnings?.currency ?? "NGN")} held by Tutova
+                      </p>
+                      <span className="mt-4 inline-flex items-center text-xs font-semibold text-[#1769D2]">
+                        View earnings
+                        <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                      </span>
+                    </div>
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                      <Wallet className="h-5 w-5" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             )}
 
-            <Card className="border-slate-200/80 shadow-sm sm:col-span-2 xl:col-span-1">
-              <CardContent className="flex items-center justify-between p-5">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    Unread notifications
-                  </p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
-                    {loading ? "—" : unread}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    Updates and reminders
-                  </p>
-                </div>
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                  <Bell className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
+            <Link
+              href="/notifications"
+              aria-label="View notifications"
+              className="group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1769D2] focus-visible:ring-offset-2"
+            >
+              <Card className="h-full border-slate-200/80 shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-amber-200 group-hover:shadow-md">
+                <CardContent className="flex h-full items-start justify-between gap-3 p-5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-500">Unread notifications</p>
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
+                      {loading ? "—" : unread}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">Updates and reminders</p>
+                    <span className="mt-4 inline-flex items-center text-xs font-semibold text-[#1769D2]">
+                      View notifications
+                      <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                    </span>
+                  </div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                    <Bell className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </section>
 
@@ -699,9 +702,11 @@ export default function DashboardPage() {
               ) : bookings.length > 0 ? (
                 <div className="divide-y divide-slate-100">
                   {bookings.slice(0, 5).map((booking) => (
-                    <div
+                    <Link
                       key={booking.id}
-                      className="flex items-center justify-between gap-3 py-4 first:pt-2 last:pb-2"
+                      href="/lessons"
+                      aria-label={`Open lessons for booking on ${formatDate(booking.start_at)}`}
+                      className="group flex items-center justify-between gap-3 rounded-xl px-2 py-4 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1769D2] first:pt-2 last:pb-2"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1769D2]">
@@ -724,7 +729,7 @@ export default function DashboardPage() {
                       >
                         {formatStatus(booking.status)}
                       </Badge>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (

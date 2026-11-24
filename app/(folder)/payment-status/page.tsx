@@ -30,11 +30,20 @@ function StatusInner() {
         `/payments/reference/${encodeURIComponent(reference)}/verify`,
         { method: "POST" },
       );
-      setStatus(String(r.status || "UNKNOWN"));
-      setDetail(JSON.stringify(r, null, 2));
-      toast.success(
-        String(r.status) === "PAID" ? "Payment confirmed" : "Payment checked",
+      const verifiedStatus = String(r.status || "UNKNOWN").toUpperCase();
+      setStatus(verifiedStatus);
+      setDetail(
+        verifiedStatus === "PAID"
+          ? "Paystack has confirmed this payment and Tutova has recorded it."
+          : verifiedStatus === "FAILED"
+            ? "The payment provider reported that this transaction failed."
+            : "The transaction has not been confirmed as paid. Your booking will not be created until payment is verified.",
       );
+      if (verifiedStatus === "PAID") {
+        toast.success("Payment confirmed");
+      } else {
+        toast.message("Payment status checked");
+      }
     } catch (e) {
       setStatus("VERIFICATION_REQUIRED");
       setDetail(e instanceof Error ? e.message : "Could not verify payment");

@@ -512,7 +512,7 @@ export default function TutorDetailsPage() {
                   </span>
 
                   {tutor.monthly_fee !== null && (
-                    <span className="text-sm text-slate-400">/ hour</span>
+                    <span className="text-sm text-slate-400">/ Month</span>
                   )}
                 </div>
 

@@ -1,18 +1,16 @@
-# Tutova frontend workflow updates
+# Tutova frontend update
 
-The frontend now includes:
+## Password reset
 
-- Direct tutor requests whose subject selector is limited to subjects taught by the selected tutor.
-- Generic matching where multiple tutors can express interest and the learner selects one.
-- Payment handoff after the learner submits the exact booking; the booking ID is passed to the payment page.
-- Agreement review for tutors and learners, including proposed revisions, financial breakdown and commission schedule.
-- Tutor and learner/parent progress-report submission.
-- Admin progress-report review, request/booking/payment oversight, dispute resolution actions and monthly payout preparation.
-- Navigation links for agreements, progress reports, requests and admin oversight.
+- `/forgot-password`
+- `/reset-password?token=...`
+- Login page includes a Forgot password link.
 
-Run locally after extracting:
+## Daily progress log
 
-```powershell
-npm ci
-npm run build
-```
+- `/progress` is the shared tutor/parent/adult learner daily progress room.
+- `/admin/progress` is the admin review and supervision interface.
+
+## Commission display
+
+New policy: first month 20% total (15% tutor + 5% parent); after one month and before three months 15% total (10% tutor + 5% parent); from three months 10% total (5% tutor + 5% parent). Parent/adult learner fee is always 5%. Existing agreement snapshots remain historical and unchanged.

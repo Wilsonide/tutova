@@ -1,6 +1,8 @@
 import type { ApiError, User } from "@/lib/types";
+const configuredApiBase = process.env.NEXT_PUBLIC_API_URL?.trim();
 const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+  configuredApiBase ||
+  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "")
 ).replace(/\/$/, "");
 const API_PREFIX = "/api/v1";
 let accessToken: string | null = null;
@@ -12,6 +14,9 @@ export function getAccessToken() {
   return accessToken;
 }
 export function apiUrl(path: string) {
+  if (!API_BASE) {
+    throw new Error("NEXT_PUBLIC_API_URL must be configured for this deployment.");
+  }
   return `${API_BASE}${API_PREFIX}${path.startsWith("/") ? path : `/${path}`}`;
 }
 async function refreshAccessToken(): Promise<string | null> {
@@ -126,6 +131,29 @@ export async function logout() {
     accessToken = null;
   }
 }
+
+export async function requestPasswordReset(email: string) {
+  return api<{ message: string }>(
+    "/auth/forgot-password",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    },
+    { auth: false, retry: false },
+  );
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  return api<{ message: string }>(
+    "/auth/reset-password",
+    {
+      method: "POST",
+      body: JSON.stringify({ token, new_password: newPassword }),
+    },
+    { auth: false, retry: false },
+  );
+}
+
 export function money(amountMinor: number, currency = "NGN") {
   return new Intl.NumberFormat("en-NG", {
     style: "currency",

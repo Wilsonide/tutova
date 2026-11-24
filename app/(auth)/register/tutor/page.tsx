@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ export default function TutorRegisterPage() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const { signIn } = useAuth();
@@ -26,6 +27,8 @@ export default function TutorRegisterPage() {
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    if (busy) return;
 
     const cleanFirstName = firstName.trim();
     const cleanLastName = lastName.trim();
@@ -163,6 +166,7 @@ export default function TutorRegisterPage() {
                   maxLength={100}
                   autoComplete="given-name"
                   value={firstName}
+                  disabled={busy}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="First name"
                 />
@@ -176,6 +180,7 @@ export default function TutorRegisterPage() {
                   maxLength={100}
                   autoComplete="family-name"
                   value={lastName}
+                  disabled={busy}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Last name"
                 />
@@ -189,27 +194,44 @@ export default function TutorRegisterPage() {
                 required
                 autoComplete="email"
                 value={email}
+                disabled={busy}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
               />
             </Field>
 
+            {/* Password with show/hide toggle */}
             <Field
               label="Create password"
               htmlFor="password"
               help="Use at least 8 characters and choose a unique password."
             >
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                maxLength={128}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="8+ characters"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete="new-password"
+                  value={password}
+                  disabled={busy}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="8+ characters"
+                  className="pr-12"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  disabled={busy}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-3 flex items-center justify-center text-slate-500 transition-colors hover:text-[#102A56] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                </button>
+              </div>
             </Field>
 
             <Button type="submit" size="lg" className="w-full" disabled={busy}>

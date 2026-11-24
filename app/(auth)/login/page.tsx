@@ -258,6 +258,15 @@ export default function LoginPage() {
               </div>
             </Field>
 
+            <div className="-mt-2 flex justify-end">
+              <Link
+                href="/forgot-password"
+                className="text-sm font-semibold text-[#0077E6] transition-colors hover:text-[#005DB8]"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
             {/* Submit */}
             <Button className="w-full" size="lg" disabled={busy} type="submit">
               {busy ? "Signing you in…" : "Sign in"}
