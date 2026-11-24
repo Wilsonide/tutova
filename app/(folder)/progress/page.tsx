@@ -49,7 +49,11 @@ type ProgressEntry = {
   created_at: string;
 };
 
-const entryOptions: { value: EntryType; label: string; icon: typeof BookOpen }[] = [
+const entryOptions: {
+  value: EntryType;
+  label: string;
+  icon: typeof BookOpen;
+}[] = [
   { value: "UPDATE", label: "Daily update", icon: BookOpen },
   { value: "MILESTONE", label: "Milestone", icon: Sparkles },
   { value: "QUESTION", label: "Question", icon: CircleHelp },
@@ -75,7 +79,9 @@ function formatTime(value: string) {
 export default function ProgressPage() {
   const { user } = useAuth();
   const [rooms, setRooms] = useState<ProgressRoom[]>([]);
-  const [entriesByRequest, setEntriesByRequest] = useState<Record<string, ProgressEntry[]>>({});
+  const [entriesByRequest, setEntriesByRequest] = useState<
+    Record<string, ProgressEntry[]>
+  >({});
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [entryType, setEntryType] = useState<EntryType>("UPDATE");
   const [message, setMessage] = useState("");
@@ -90,10 +96,14 @@ export default function ProgressPage() {
       setActiveRequestId((current) =>
         current && roomRows.some((room) => room.id === current)
           ? current
-          : roomRows[0]?.id ?? null,
+          : (roomRows[0]?.id ?? null),
       );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load your learning rooms.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not load your learning rooms.",
+      );
     } finally {
       setLoading(false);
     }
@@ -110,9 +120,14 @@ export default function ProgressPage() {
     let active = true;
     const refreshRoom = async () => {
       try {
-        const entries = await api<ProgressEntry[]>(`/progress-logs/requests/${activeRequestId}`);
+        const entries = await api<ProgressEntry[]>(
+          `/progress-logs/requests/${activeRequestId}`,
+        );
         if (active) {
-          setEntriesByRequest((current) => ({ ...current, [activeRequestId]: entries }));
+          setEntriesByRequest((current) => ({
+            ...current,
+            [activeRequestId]: entries,
+          }));
         }
       } catch {
         // Keep the current conversation visible if a background refresh fails.
@@ -126,20 +141,32 @@ export default function ProgressPage() {
   }, [activeRequestId]);
 
   const activeRoom = rooms.find((room) => room.id === activeRequestId) ?? null;
-  const activeEntries = activeRequestId ? entriesByRequest[activeRequestId] ?? [] : [];
+  const activeEntries = activeRequestId
+    ? (entriesByRequest[activeRequestId] ?? [])
+    : [];
 
   useEffect(() => {
     if (!activeRequestId) return;
+    const requestId = activeRequestId;
     let active = true;
     async function loadActiveRoom() {
       try {
-        const entries = await api<ProgressEntry[]>(`/progress-logs/requests/${activeRequestId}`);
+        const entries = await api<ProgressEntry[]>(
+          `/progress-logs/requests/${requestId}`,
+        );
         if (active) {
-          setEntriesByRequest((current) => ({ ...current, [activeRequestId]: entries }));
+          setEntriesByRequest((current) => ({
+            ...current,
+            [requestId]: entries,
+          }));
         }
       } catch (error) {
         if (active) {
-          toast.error(error instanceof Error ? error.message : "Could not load this conversation.");
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Could not load this conversation.",
+          );
         }
       }
     }
@@ -158,19 +185,31 @@ export default function ProgressPage() {
     try {
       await api(`/progress-logs/requests/${activeRequestId}`, {
         method: "POST",
-        body: JSON.stringify({ entry_type: entryType, message: message.trim() }),
+        body: JSON.stringify({
+          entry_type: entryType,
+          message: message.trim(),
+        }),
       });
       setMessage("");
       setEntryType("UPDATE");
-      toast.success(entryType === "CONCERN" ? "Concern submitted to Tutova for review." : "Your progress update has been added.");
+      toast.success(
+        entryType === "CONCERN"
+          ? "Concern submitted to Tutova for review."
+          : "Your progress update has been added.",
+      );
       const [updatedEntries, updatedRooms] = await Promise.all([
         api<ProgressEntry[]>(`/progress-logs/requests/${activeRequestId}`),
         api<ProgressRoom[]>("/progress-logs/rooms"),
       ]);
-      setEntriesByRequest((current) => ({ ...current, [activeRequestId]: updatedEntries }));
+      setEntriesByRequest((current) => ({
+        ...current,
+        [activeRequestId]: updatedEntries,
+      }));
       setRooms(updatedRooms);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not send your update.");
+      toast.error(
+        error instanceof Error ? error.message : "Could not send your update.",
+      );
     } finally {
       setSending(false);
     }
@@ -188,63 +227,83 @@ export default function ProgressPage() {
               <MessageCircle size={18} />
               <h2 className="font-bold">Your learning rooms</h2>
             </div>
-            <p className="mt-1 text-xs leading-5 text-slate-500">Each room follows an accepted tutoring relationship.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Each room follows an accepted tutoring relationship.
+            </p>
           </div>
           <CardContent className="p-2">
             {loading ? (
-              <p className="p-4 text-sm text-slate-500">Loading your tutoring rooms…</p>
+              <p className="p-4 text-sm text-slate-500">
+                Loading your tutoring rooms…
+              </p>
             ) : rooms.length === 0 ? (
               <div className="p-5 text-center">
                 <Users className="mx-auto text-slate-300" size={28} />
-                <p className="mt-3 text-sm font-semibold text-[#102A56]">No learning rooms yet</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Your progress log will appear as soon as a tutor accepts your tutoring request.</p>
+                <p className="mt-3 text-sm font-semibold text-[#102A56]">
+                  No learning rooms yet
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Your progress log will appear as soon as a tutor accepts your
+                  tutoring request.
+                </p>
               </div>
-            ) : rooms.map((room) => {
-              const active = room.id === activeRequestId;
-              const roomEntries = entriesByRequest[room.id] ?? [];
-              const hasLoadedRoom = Object.prototype.hasOwnProperty.call(entriesByRequest, room.id);
-              const lastEntry = roomEntries[roomEntries.length - 1];
-              return (
-                <button
-                  key={room.id}
-                  type="button"
-                  onClick={() => setActiveRequestId(room.id)}
-                  className={`w-full rounded-xl p-3 text-left transition ${active ? "bg-[#EDF4FF] ring-1 ring-[#1769D2]/15" : "hover:bg-slate-50"}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${active ? "bg-[#1769D2] text-white" : "bg-[#EAF3F7] text-[#1769D2]"}`}>
-                        <BookOpen size={18} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-bold text-[#102A56]">
-                          {isTutor
-                            ? room.requester_role === "PARENT"
-                              ? `Parent: ${room.requester_name}`
-                              : `Adult learner: ${room.requester_name}`
-                            : `Tutor: ${room.tutor_name}`}
+            ) : (
+              rooms.map((room) => {
+                const active = room.id === activeRequestId;
+                const roomEntries = entriesByRequest[room.id] ?? [];
+                const hasLoadedRoom = Object.prototype.hasOwnProperty.call(
+                  entriesByRequest,
+                  room.id,
+                );
+                const lastEntry = roomEntries[roomEntries.length - 1];
+                return (
+                  <button
+                    key={room.id}
+                    type="button"
+                    onClick={() => setActiveRequestId(room.id)}
+                    className={`w-full rounded-xl p-3 text-left transition ${active ? "bg-[#EDF4FF] ring-1 ring-[#1769D2]/15" : "hover:bg-slate-50"}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${active ? "bg-[#1769D2] text-white" : "bg-[#EAF3F7] text-[#1769D2]"}`}
+                        >
+                          <BookOpen size={18} />
                         </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-slate-500">
-                          {room.requester_role === "PARENT"
-                            ? room.learner_name
-                              ? `Learner: ${room.learner_name} · Parent: ${room.requester_name}`
-                              : `Parent: ${room.requester_name} · ${room.subject_name}`
-                            : `Adult learner: ${room.requester_name} · ${room.subject_name}`}
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-[#102A56]">
+                            {isTutor
+                              ? room.requester_role === "PARENT"
+                                ? `Parent: ${room.requester_name}`
+                                : `Adult learner: ${room.requester_name}`
+                              : `Tutor: ${room.tutor_name}`}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                            {room.requester_role === "PARENT"
+                              ? room.learner_name
+                                ? `Learner: ${room.learner_name} · Parent: ${room.requester_name}`
+                                : `Parent: ${room.requester_name} · ${room.subject_name}`
+                              : `Adult learner: ${room.requester_name} · ${room.subject_name}`}
+                          </span>
                         </span>
-                      </span>
+                      </div>
+                      {(entriesByRequest[room.id] ?? []).length > 0 && (
+                        <Badge>
+                          {(entriesByRequest[room.id] ?? []).length}
+                        </Badge>
+                      )}
                     </div>
-                    {(entriesByRequest[room.id] ?? []).length > 0 && <Badge>{(entriesByRequest[room.id] ?? []).length}</Badge>}
-                  </div>
-                  <p className="mt-2 truncate text-xs text-slate-500">
-                    {lastEntry
-                      ? `${lastEntry.author_name}: ${lastEntry.message}`
-                      : hasLoadedRoom
-                        ? "No progress updates yet"
-                        : `${room.subject_name} · Open conversation to view updates`}
-                  </p>
-                </button>
-              );
-            })}
+                    <p className="mt-2 truncate text-xs text-slate-500">
+                      {lastEntry
+                        ? `${lastEntry.author_name}: ${lastEntry.message}`
+                        : hasLoadedRoom
+                          ? "No progress updates yet"
+                          : `${room.subject_name} · Open conversation to view updates`}
+                    </p>
+                  </button>
+                );
+              })
+            )}
           </CardContent>
         </Card>
 
@@ -253,7 +312,9 @@ export default function ProgressPage() {
             <>
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-5 py-4 sm:px-6">
                 <div className="flex items-center gap-3">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#EAF3F7] text-[#1769D2]"><MessageCircle size={20} /></span>
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#EAF3F7] text-[#1769D2]">
+                    <MessageCircle size={20} />
+                  </span>
                   <div>
                     <h2 className="font-bold text-[#102A56]">
                       {isTutor
@@ -271,47 +332,108 @@ export default function ProgressPage() {
                     </p>
                   </div>
                 </div>
-                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">Tutova supervised</Badge>
+                <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+                  Tutova supervised
+                </Badge>
               </div>
 
               <div className="flex-1 space-y-5 overflow-y-auto bg-[#F7F9FC] p-4 sm:p-6">
                 <div className="mx-auto max-w-xl rounded-2xl border border-blue-100 bg-blue-50/80 p-4 text-center">
                   <ShieldCheckIcon />
-                  <p className="mt-2 text-sm font-semibold text-[#102A56]">A shared record of learning</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">Tutors and learners can post updates here. Tutova administrators can review entries and follow up on concerns.</p>
+                  <p className="mt-2 text-sm font-semibold text-[#102A56]">
+                    A shared record of learning
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
+                    Tutors and learners can post updates here. Tutova
+                    administrators can review entries and follow up on concerns.
+                  </p>
                 </div>
 
                 {activeEntries.length === 0 ? (
                   <div className="grid min-h-48 place-items-center text-center">
                     <div>
-                      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-slate-300 shadow-sm"><MessageCircle size={22} /></div>
-                      <p className="mt-3 text-sm font-semibold text-[#102A56]">Start your daily learning log</p>
-                      <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">Share what was covered, what went well, a milestone, a question or something that needs attention.</p>
+                      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-slate-300 shadow-sm">
+                        <MessageCircle size={22} />
+                      </div>
+                      <p className="mt-3 text-sm font-semibold text-[#102A56]">
+                        Start your daily learning log
+                      </p>
+                      <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">
+                        Share what was covered, what went well, a milestone, a
+                        question or something that needs attention.
+                      </p>
                     </div>
                   </div>
-                ) : activeEntries.map((entry) => {
-                  const mine = entry.author_user_id === user?.id;
-                  const concern = entry.entry_type === "CONCERN";
-                  return (
-                    <div key={entry.id}>
-                      <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">{formatDay(entry.log_date)}</p>
-                      <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[78%] ${mine ? "rounded-br-md bg-[#1769D2] text-white" : "rounded-bl-md border border-slate-100 bg-white text-slate-700"}`}>
-                          <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <span className={`text-xs font-bold ${mine ? "text-white" : "text-[#102A56]"}`}>{mine ? "You" : entry.author_name}</span>
-                            <span className={`text-[10px] ${mine ? "text-blue-100" : "text-slate-400"}`}>{entry.author_type === "TUTOR" ? "Tutor" : "Learner / parent"} · {formatTime(entry.created_at)}</span>
-                            {concern && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800"><Flag size={10} /> Concern</span>}
-                            {entry.entry_type === "MILESTONE" && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">Milestone</span>}
-                            {entry.entry_type === "QUESTION" && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-800">Question</span>}
+                ) : (
+                  activeEntries.map((entry) => {
+                    const mine = entry.author_user_id === user?.id;
+                    const concern = entry.entry_type === "CONCERN";
+                    return (
+                      <div key={entry.id}>
+                        <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          {formatDay(entry.log_date)}
+                        </p>
+                        <div
+                          className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[78%] ${mine ? "rounded-br-md bg-[#1769D2] text-white" : "rounded-bl-md border border-slate-100 bg-white text-slate-700"}`}
+                          >
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <span
+                                className={`text-xs font-bold ${mine ? "text-white" : "text-[#102A56]"}`}
+                              >
+                                {mine ? "You" : entry.author_name}
+                              </span>
+                              <span
+                                className={`text-[10px] ${mine ? "text-blue-100" : "text-slate-400"}`}
+                              >
+                                {entry.author_type === "TUTOR"
+                                  ? "Tutor"
+                                  : "Learner / parent"}{" "}
+                                · {formatTime(entry.created_at)}
+                              </span>
+                              {concern && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                                  <Flag size={10} /> Concern
+                                </span>
+                              )}
+                              {entry.entry_type === "MILESTONE" && (
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                                  Milestone
+                                </span>
+                              )}
+                              {entry.entry_type === "QUESTION" && (
+                                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-800">
+                                  Question
+                                </span>
+                              )}
+                            </div>
+                            <p className="whitespace-pre-wrap text-sm leading-6">
+                              {entry.message}
+                            </p>
+                            {entry.review_status !== "PENDING" && (
+                              <p
+                                className={`mt-2 text-[10px] font-semibold ${mine ? "text-blue-100" : "text-slate-400"}`}
+                              >
+                                Tutova review:{" "}
+                                {entry.review_status.replaceAll("_", " ")}
+                              </p>
+                            )}
+                            {entry.admin_review_notes && (
+                              <div
+                                className={`mt-3 rounded-lg p-2 text-xs ${mine ? "bg-white/10 text-blue-50" : "bg-blue-50 text-blue-900"}`}
+                              >
+                                <strong>Tutova review:</strong>{" "}
+                                {entry.admin_review_notes}
+                              </div>
+                            )}
                           </div>
-                          <p className="whitespace-pre-wrap text-sm leading-6">{entry.message}</p>
-                          {entry.review_status !== "PENDING" && <p className={`mt-2 text-[10px] font-semibold ${mine ? "text-blue-100" : "text-slate-400"}`}>Tutova review: {entry.review_status.replaceAll("_", " ")}</p>}
-                          {entry.admin_review_notes && <div className={`mt-3 rounded-lg p-2 text-xs ${mine ? "bg-white/10 text-blue-50" : "bg-blue-50 text-blue-900"}`}><strong>Tutova review:</strong> {entry.admin_review_notes}</div>}
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
               <div className="border-t border-slate-100 bg-white p-4 sm:p-5">
@@ -321,24 +443,63 @@ export default function ProgressPage() {
                       const Icon = option.icon;
                       const active = entryType === option.value;
                       return (
-                        <button key={option.value} type="button" onClick={() => setEntryType(option.value)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? option.value === "CONCERN" ? "border-amber-300 bg-amber-50 text-amber-800" : "border-[#1769D2]/25 bg-[#EDF4FF] text-[#1769D2]" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setEntryType(option.value)}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? (option.value === "CONCERN" ? "border-amber-300 bg-amber-50 text-amber-800" : "border-[#1769D2]/25 bg-[#EDF4FF] text-[#1769D2]") : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+                        >
                           <Icon size={13} /> {option.label}
                         </button>
                       );
                     })}
                   </div>
-                  {entryType === "CONCERN" && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">This entry will be escalated to Tutova administrators for follow-up.</p>}
+                  {entryType === "CONCERN" && (
+                    <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                      This entry will be escalated to Tutova administrators for
+                      follow-up.
+                    </p>
+                  )}
                   <div className="flex items-end gap-2">
-                    <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={3} maxLength={5000} placeholder={isTutor ? "Share today's lesson progress, learner response or next steps…" : "Share your learning experience, feedback or a question…"} className="min-h-[82px] flex-1 resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#1769D2] focus:bg-white focus:ring-2 focus:ring-[#1769D2]/10" />
-                    <Button type="submit" disabled={sending || message.trim().length < 2} className="h-11 shrink-0 px-4"><Send size={16} className="mr-2" />{sending ? "Sending" : "Send"}</Button>
+                    <textarea
+                      value={message}
+                      onChange={(event) => setMessage(event.target.value)}
+                      rows={3}
+                      maxLength={5000}
+                      placeholder={
+                        isTutor
+                          ? "Share today's lesson progress, learner response or next steps…"
+                          : "Share your learning experience, feedback or a question…"
+                      }
+                      className="min-h-[82px] flex-1 resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-[#1769D2] focus:bg-white focus:ring-2 focus:ring-[#1769D2]/10"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={sending || message.trim().length < 2}
+                      className="h-11 shrink-0 px-4"
+                    >
+                      <Send size={16} className="mr-2" />
+                      {sending ? "Sending" : "Send"}
+                    </Button>
                   </div>
-                  <p className="text-right text-[10px] text-slate-400">{message.length}/5000 characters · Entries are retained in the tutoring record.</p>
+                  <p className="text-right text-[10px] text-slate-400">
+                    {message.length}/5000 characters · Entries are retained in
+                    the tutoring record.
+                  </p>
                 </form>
               </div>
             </>
           ) : (
             <div className="grid flex-1 place-items-center p-8 text-center">
-              <div><BookOpen className="mx-auto text-slate-300" size={32} /><p className="mt-3 font-semibold text-[#102A56]">Your learning log will appear here</p><p className="mt-1 text-sm text-slate-500">Select a tutoring room to view its daily updates.</p></div>
+              <div>
+                <BookOpen className="mx-auto text-slate-300" size={32} />
+                <p className="mt-3 font-semibold text-[#102A56]">
+                  Your learning log will appear here
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Select a tutoring room to view its daily updates.
+                </p>
+              </div>
             </div>
           )}
         </Card>
