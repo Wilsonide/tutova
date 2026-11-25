@@ -45,6 +45,9 @@ type Verification = {
   nda_version: string | null;
 
   nda_accepted_at: string | null;
+  nda_content?: string | null;
+  nda_accepted_ip?: string | null;
+  nda_accepted_user_agent?: string | null;
 
   submitted_at: string | null;
 
@@ -71,6 +74,13 @@ type Referee = {
   consented_at: string | null;
 
   responded_at: string | null;
+  reference_submitted_at?: string | null;
+  consented_name?: string | null;
+  consent_statement?: string | null;
+  reference_response?: Record<string, unknown> | null;
+  reference_ip_address?: string | null;
+  safeguarding_review_required?: boolean;
+  safeguarding_review_reasons?: string[];
 };
 
 type PayoutStatus = "REQUESTED" | "PROCESSING" | "PAID" | "FAILED" | "REVERSED";
@@ -103,6 +113,12 @@ type IdentityDocumentDownload = {
   download_url: string;
 
   expires_in_seconds: number;
+};
+
+type AdminTutorBackground = {
+  education: Array<Record<string, any>>;
+  certifications: Array<Record<string, any>>;
+  work_history: Array<Record<string, any>>;
 };
 
 type UserStatus = "ACTIVE" | "INACTIVE" | "SUSPENDED" | "PENDING_VERIFICATION";
@@ -339,6 +355,9 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
   >({});
 
   const [loadingReferees, setLoadingReferees] = useState<string | null>(null);
+  const [backgroundByVerification, setBackgroundByVerification] = useState<Record<string, AdminTutorBackground>>({});
+  const [loadingBackground, setLoadingBackground] = useState<string | null>(null);
+  const [openingBackgroundDocument, setOpeningBackgroundDocument] = useState<string | null>(null);
 
   const [payouts, setPayouts] = useState<Payout[]>([]);
 
@@ -580,6 +599,36 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
       );
     } finally {
       setLoadingReferees(null);
+    }
+  }
+
+  async function loadTutorBackground(verificationId: string) {
+    setLoadingBackground(verificationId);
+    try {
+      const result = await api<AdminTutorBackground>(
+        `/tutors/profile/admin/verification/${verificationId}/background`,
+      );
+      setBackgroundByVerification((current) => ({ ...current, [verificationId]: result }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load tutor background documents.");
+    } finally {
+      setLoadingBackground(null);
+    }
+  }
+
+  async function openBackgroundDocument(recordType: "education" | "certification", recordId: string) {
+    const key = `${recordType}:${recordId}`;
+    setOpeningBackgroundDocument(key);
+    try {
+      const result = await api<IdentityDocumentDownload>(
+        `/tutors/profile/admin/background-documents/${recordType}/${recordId}`,
+      );
+      if (!result.download_url) throw new Error("The secure document link was not returned.");
+      window.open(result.download_url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not open background document.");
+    } finally {
+      setOpeningBackgroundDocument(null);
     }
   }
 
@@ -1638,6 +1687,70 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
                         </Button>
                       </div>
 
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                        <p className="text-sm font-semibold text-[#102A56]">Tutor NDA acceptance</p>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                          <span>Version: {verification.nda_version || "Not recorded"}</span>
+                          <span>Accepted: {verification.nda_accepted_at ? new Date(verification.nda_accepted_at).toLocaleString() : "Not accepted"}</span>
+                          {verification.nda_accepted_ip && <span>IP: {verification.nda_accepted_ip}</span>}
+                        </div>
+                        {verification.nda_content ? (
+                          <details className="mt-3">
+                            <summary className="cursor-pointer text-sm font-medium text-[#1769D2]">Read the complete NDA accepted by this tutor</summary>
+                            <div className="mt-2 max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-6 text-slate-700">{verification.nda_content}</div>
+                          </details>
+                        ) : (
+                          <p className="mt-2 text-sm text-amber-700">No NDA text snapshot is stored for this verification record.</p>
+                        )}
+                        {verification.nda_accepted_user_agent && <p className="mt-2 break-all text-[11px] text-slate-400">Browser: {verification.nda_accepted_user_agent}</p>}
+                      </div>
+
+                      <div className="mt-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={loadingBackground === verification.id}
+                          onClick={() => void loadTutorBackground(verification.id)}
+                        >
+                          {loadingBackground === verification.id ? "Loading submitted documents…" : "View education, certifications and work history"}
+                        </Button>
+                        {backgroundByVerification[verification.id] && (
+                          <div className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div>
+                              <p className="font-semibold text-sm text-[#102A56]">Education history</p>
+                              {backgroundByVerification[verification.id].education.length ? backgroundByVerification[verification.id].education.map((record) => (
+                                <div key={record.id} className="mt-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                                  <p className="font-medium">{record.institution_name} · {record.country_code}</p>
+                                  <p className="text-slate-600">{record.course_of_study}{record.specialty ? ` · ${record.specialty}` : ""}</p>
+                                  <p className="text-xs text-slate-500">{record.qualification_type} · {record.grade || "Grade not supplied"} · {record.start_date} – {record.currently_enrolled ? "Present" : record.end_date}</p>
+                                  {record.document_name && <Button className="mt-2" size="sm" variant="outline" disabled={openingBackgroundDocument === `education:${record.id}`} onClick={() => void openBackgroundDocument("education", record.id)}>{openingBackgroundDocument === `education:${record.id}` ? "Opening…" : `View ${record.document_name}`}</Button>}
+                                </div>
+                              )) : <p className="mt-1 text-sm text-slate-500">No education records submitted.</p>}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm text-[#102A56]">Professional certifications</p>
+                              {backgroundByVerification[verification.id].certifications.length ? backgroundByVerification[verification.id].certifications.map((record) => (
+                                <div key={record.id} className="mt-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                                  <p className="font-medium">{record.name}</p>
+                                  <p className="text-xs text-slate-500">{record.issuing_organization || "Issuer not supplied"} · Obtained: {record.date_obtained || "Not supplied"} · Expires: {record.expiry_date || "Not supplied"}</p>
+                                  {record.document_name && <Button className="mt-2" size="sm" variant="outline" disabled={openingBackgroundDocument === `certification:${record.id}`} onClick={() => void openBackgroundDocument("certification", record.id)}>{openingBackgroundDocument === `certification:${record.id}` ? "Opening…" : `View ${record.document_name}`}</Button>}
+                                </div>
+                              )) : <p className="mt-1 text-sm text-slate-500">No certifications submitted.</p>}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-sm text-[#102A56]">Work history</p>
+                              {backgroundByVerification[verification.id].work_history.length ? backgroundByVerification[verification.id].work_history.map((record) => (
+                                <div key={record.id} className="mt-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                                  <p className="font-medium">{record.job_title} · {record.organization}</p>
+                                  <p className="text-xs text-slate-500">{record.employment_type || "Employment type not supplied"} · {record.start_date} – {record.currently_working ? "Present" : record.end_date}</p>
+                                  {record.description && <p className="mt-1 whitespace-pre-wrap text-slate-600">{record.description}</p>}
+                                </div>
+                              )) : <p className="mt-1 text-sm text-slate-500">No work history submitted.</p>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="mt-3">
                         <Button
                           size="sm"
@@ -1647,7 +1760,7 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
                         >
                           {loadingReferees === verification.id
                             ? "Loading referees…"
-                            : "View referee consent records"}
+                            : "View referee responses and consent records"}
                         </Button>
 
                         {refereesByVerification[verification.id] && (
@@ -1688,6 +1801,24 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
                                   >
                                     {referee.status}
                                   </Badge>
+                                  {referee.reference_response && (
+                                    <div className="mt-3 w-full rounded-lg border border-slate-200 bg-white p-3">
+                                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#102A56]">Complete referee form responses</p>
+                                      {referee.consented_name && <p className="mb-1 text-sm text-slate-700">Submitted by: <strong>{referee.consented_name}</strong></p>}
+                                      {referee.consent_statement && <p className="mb-2 rounded-md bg-blue-50 p-2 text-xs leading-5 text-blue-900">{referee.consent_statement}</p>}
+                                      <dl className="grid gap-2 sm:grid-cols-2">
+                                        {Object.entries(referee.reference_response).map(([field, value]) => (
+                                          <div key={field} className="rounded-md bg-slate-50 p-2">
+                                            <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{field.replaceAll("_", " ")}</dt>
+                                            <dd className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{typeof value === "string" ? value : value == null ? "—" : JSON.stringify(value)}</dd>
+                                          </div>
+                                        ))}
+                                      </dl>
+                                      {referee.reference_submitted_at && <p className="mt-2 text-xs text-slate-500">Form submitted: {new Date(referee.reference_submitted_at).toLocaleString()}</p>}
+                                      {referee.reference_ip_address && <p className="text-xs text-slate-500">Submission IP: {referee.reference_ip_address}</p>}
+                                      {referee.safeguarding_review_required && <p className="mt-2 text-xs font-medium text-rose-700">Safeguarding review required: {(referee.safeguarding_review_reasons ?? []).join(", ")}</p>}
+                                    </div>
+                                  )}
                                 </div>
                               ),
                             )}

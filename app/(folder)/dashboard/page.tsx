@@ -12,7 +12,6 @@ import {
   Wallet,
   BookOpen,
   Users,
-  Pencil,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,16 +32,6 @@ type TutorEarningsSummary = {
   current_month_earnings_minor: number;
   held_tutor_earnings_minor: number;
   paid_out_minor: number;
-};
-
-type ChildLearner = {
-  id: string;
-  parent_profile_id: string | null;
-  user_id: string | null;
-  first_name: string;
-  last_name: string;
-  created_at: string;
-  updated_at: string;
 };
 
 function formatDate(date: string) {
@@ -90,11 +79,9 @@ export default function DashboardPage() {
 
   const [requests, setRequests] = useState<TutoringRequest[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [children, setChildren] = useState<ChildLearner[]>([]);
   const [unread, setUnread] = useState(0);
   const [earnings, setEarnings] = useState<TutorEarningsSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [childrenLoading, setChildrenLoading] = useState(false);
 
   const isTutor = user?.role === "TUTOR";
   const isAdultLearner = user?.role === "ADULT_LEARNER";
@@ -125,7 +112,6 @@ export default function DashboardPage() {
 
     async function loadDashboard() {
       setLoading(true);
-      if (isParent) setChildrenLoading(true);
 
       const tasks = [
         api<TutoringRequest[]>(
@@ -136,26 +122,27 @@ export default function DashboardPage() {
         isTutor
           ? api<TutorEarningsSummary>("/payments/earnings/summary")
           : Promise.resolve(null),
-        isParent
-          ? api<ChildLearner[]>("/parents/learners")
-          : Promise.resolve(null),
       ] as const;
 
       const results = await Promise.allSettled(tasks);
+
       if (!active) return;
 
-      const [requestResult, bookingResult, notificationResult, earningsResult, childrenResult] =
+      const [requestResult, bookingResult, notificationResult, earningsResult] =
         results;
 
       if (requestResult.status === "fulfilled") {
         setRequests(requestResult.value);
       }
+
       if (bookingResult.status === "fulfilled") {
         setBookings(bookingResult.value);
       }
+
       if (notificationResult.status === "fulfilled") {
         setUnread(notificationResult.value.unread_count || 0);
       }
+
       if (
         isTutor &&
         earningsResult.status === "fulfilled" &&
@@ -163,15 +150,9 @@ export default function DashboardPage() {
       ) {
         setEarnings(earningsResult.value);
       }
-      if (
-        isParent &&
-        childrenResult.status === "fulfilled" &&
-        childrenResult.value
-      ) {
-        setChildren(childrenResult.value);
-      }
 
       const coreResults = [requestResult, bookingResult, notificationResult];
+
       if (coreResults.every((result) => result.status === "rejected")) {
         toast.error("Dashboard information could not be loaded.");
       } else if (coreResults.some((result) => result.status === "rejected")) {
@@ -181,12 +162,8 @@ export default function DashboardPage() {
       if (isTutor && earningsResult.status === "rejected") {
         toast.error("Tutor earnings summary could not be loaded.");
       }
-      if (isParent && childrenResult.status === "rejected") {
-        toast.error("Your children could not be loaded.");
-      }
 
       setLoading(false);
-      setChildrenLoading(false);
     }
 
     void loadDashboard();
@@ -258,115 +235,6 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Parent: My Children */}
-        {isParent && (
-          <section>
-            <Card className="border-slate-200/80 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base font-bold text-[#102A56]">
-                    <Users className="h-5 w-5 text-[#1769D2]" />
-                    My Children
-                  </CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Manage the learner profiles linked to your account.
-                  </p>
-                </div>
-
-              </CardHeader>
-
-              <CardContent>
-                {childrenLoading ? (
-                  <div className="space-y-3 py-2">
-                    {[1, 2].map((item) => (
-                      <div
-                        key={item}
-                        className="flex animate-pulse items-center gap-3 rounded-xl border border-slate-100 p-3"
-                      >
-                        <div className="h-10 w-10 rounded-full bg-slate-100" />
-                        <div className="space-y-2">
-                          <div className="h-3 w-32 rounded bg-slate-100" />
-                          <div className="h-2.5 w-20 rounded bg-slate-100" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : children.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {children.slice(0, 6).map((child) => (
-                        <div
-                          key={child.id}
-                          className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"
-                        >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-[#1769D2]">
-                            {child.first_name.charAt(0).toUpperCase()}
-                            {child.last_name.charAt(0).toUpperCase()}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-slate-800">
-                              {child.first_name} {child.last_name}
-                            </p>
-                            <p className="mt-0.5 text-xs text-slate-500">
-                              Learner profile
-                            </p>
-                          </div>
-
-                          <Link
-                            href="/children"
-                            aria-label={`Manage ${child.first_name}'s profile`}
-                            className="rounded-lg p-2 text-slate-400 transition hover:bg-blue-50 hover:text-[#1769D2]"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-xs text-slate-500">
-                        {children.length}{" "}
-                        {children.length === 1 ? "learner" : "learners"}{" "}
-                        registered
-                      </p>
-
-                      <Link
-                        href="/children"
-                        className="inline-flex items-center text-sm font-semibold text-[#1769D2] hover:text-[#1258B5]"
-                      >
-                        Manage children
-                        <ArrowRight className="ml-1.5 h-4 w-4" />
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-5 py-8 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#1769D2]">
-                      <Users className="h-6 w-6" />
-                    </div>
-
-                    <p className="mt-3 text-sm font-semibold text-slate-800">
-                      No learner profiles yet
-                    </p>
-
-                    <p className="mt-1 max-w-sm text-sm leading-6 text-slate-500">
-                      Learner profiles linked to your account will appear here.
-                      You can review existing profiles and their tutoring activity from this section.
-                    </p>
-                  </div>
-                )}
-
-                {!childrenLoading && children.length > 6 && (
-                  <p className="mt-3 text-xs text-slate-500">
-                    Showing 6 of {children.length} learner profiles.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </section>
-        )}
-
         {/* Statistics */}
         <section>
           <div className="mb-4">
@@ -376,7 +244,11 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className={`grid gap-4 sm:grid-cols-2 ${isTutor ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+          <div
+            className={`grid gap-4 sm:grid-cols-2 ${
+              isTutor ? "xl:grid-cols-4" : "xl:grid-cols-3"
+            }`}
+          >
             <Link
               href="/requests"
               aria-label={`View ${requestLabel}`}
@@ -385,12 +257,16 @@ export default function DashboardPage() {
               <Card className="h-full border-slate-200/80 shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-blue-200 group-hover:shadow-md">
                 <CardContent className="flex h-full items-start justify-between gap-3 p-5">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-500">{requestLabel}</p>
+                    <p className="text-sm font-medium text-slate-500">
+                      {requestLabel}
+                    </p>
                     <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
                       {loading ? "—" : requests.length}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      {isTutor ? "Opportunities available" : "Submitted requests"}
+                      {isTutor
+                        ? "Opportunities available"
+                        : "Submitted requests"}
                     </p>
                     <span className="mt-4 inline-flex items-center text-xs font-semibold text-[#1769D2]">
                       View requests
@@ -412,7 +288,9 @@ export default function DashboardPage() {
               <Card className="h-full border-slate-200/80 shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-teal-200 group-hover:shadow-md">
                 <CardContent className="flex h-full items-start justify-between gap-3 p-5">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-500">Bookings</p>
+                    <p className="text-sm font-medium text-slate-500">
+                      Bookings
+                    </p>
                     <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
                       {loading ? "—" : bookings.length}
                     </p>
@@ -440,12 +318,23 @@ export default function DashboardPage() {
                 <Card className="h-full border-slate-200/80 shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-emerald-200 group-hover:shadow-md">
                   <CardContent className="flex h-full items-start justify-between gap-3 p-5">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-500">This month's earnings</p>
+                      <p className="text-sm font-medium text-slate-500">
+                        This month's earnings
+                      </p>
                       <p className="mt-2 break-words text-2xl font-bold tracking-tight text-[#00AFA0]">
-                        {loading ? "—" : money(earnings?.current_month_earnings_minor ?? 0, earnings?.currency ?? "NGN")}
+                        {loading
+                          ? "—"
+                          : money(
+                              earnings?.current_month_earnings_minor ?? 0,
+                              earnings?.currency ?? "NGN",
+                            )}
                       </p>
                       <p className="mt-1 text-xs text-slate-400">
-                        {money(earnings?.held_tutor_earnings_minor ?? 0, earnings?.currency ?? "NGN")} held by Tutova
+                        {money(
+                          earnings?.held_tutor_earnings_minor ?? 0,
+                          earnings?.currency ?? "NGN",
+                        )}{" "}
+                        held by Tutova
                       </p>
                       <span className="mt-4 inline-flex items-center text-xs font-semibold text-[#1769D2]">
                         View earnings
@@ -468,11 +357,15 @@ export default function DashboardPage() {
               <Card className="h-full border-slate-200/80 shadow-sm transition-all duration-200 group-hover:-translate-y-1 group-hover:border-amber-200 group-hover:shadow-md">
                 <CardContent className="flex h-full items-start justify-between gap-3 p-5">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-500">Unread notifications</p>
+                    <p className="text-sm font-medium text-slate-500">
+                      Unread notifications
+                    </p>
                     <p className="mt-2 text-3xl font-bold tracking-tight text-[#102A56]">
                       {loading ? "—" : unread}
                     </p>
-                    <p className="mt-1 text-xs text-slate-400">Updates and reminders</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Updates and reminders
+                    </p>
                     <span className="mt-4 inline-flex items-center text-xs font-semibold text-[#1769D2]">
                       View notifications
                       <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
@@ -725,7 +618,9 @@ export default function DashboardPage() {
                       </div>
 
                       <Badge
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${getStatusStyle(booking.status)}`}
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${getStatusStyle(
+                          booking.status,
+                        )}`}
                       >
                         {formatStatus(booking.status)}
                       </Badge>

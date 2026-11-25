@@ -175,3 +175,55 @@ export type TutorVerificationStatus = {
 export async function getMyTutorVerification(): Promise<TutorVerificationStatus> {
   return api<TutorVerificationStatus>("/verification/tutor/me");
 }
+
+
+export function uploadWithProgress<T>(
+  path: string,
+  body: FormData,
+  onProgress: (percentage: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const send = (retry = false) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", apiUrl(path), true);
+      xhr.withCredentials = true;
+      if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Network error while uploading the document."));
+      xhr.onabort = () => reject(new Error("Document upload was cancelled."));
+      xhr.onload = async () => {
+        if (xhr.status === 401 && !retry) {
+          const token = await refreshAccessToken();
+          if (token) {
+            send(true);
+            return;
+          }
+        }
+        if (xhr.status < 200 || xhr.status >= 300) {
+          let message = `Document upload failed (${xhr.status}).`;
+          try {
+            const payload = JSON.parse(xhr.responseText) as ApiError;
+            if (typeof payload.detail === "string") message = payload.detail;
+            else if (Array.isArray(payload.detail)) {
+              message = payload.detail.map((item) => item.msg).filter(Boolean).join(" · ") || message;
+            }
+          } catch {}
+          reject(new Error(message));
+          return;
+        }
+        onProgress(100);
+        try {
+          resolve(xhr.responseText ? (JSON.parse(xhr.responseText) as T) : (undefined as T));
+        } catch {
+          reject(new Error("The server returned an unreadable upload response."));
+        }
+      };
+      xhr.send(body);
+    };
+    send();
+  });
+}

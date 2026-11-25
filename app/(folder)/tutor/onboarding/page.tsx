@@ -8,7 +8,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { api, uploadWithProgress } from "@/lib/api";
 import type { Subject, Location } from "@/lib/types";
 import { toast } from "sonner";
 import {
@@ -21,6 +21,8 @@ import {
   Loader2,
   MapPin,
   Plus,
+  RotateCcw,
+  RotateCw,
   Search,
   ShieldCheck,
   Trash2,
@@ -84,6 +86,9 @@ type VerificationResponse = {
   status: VerificationStatus;
   nda_version?: string | null;
   nda_accepted_at?: string | null;
+  nda_content?: string | null;
+  nda_accepted_ip?: string | null;
+  nda_accepted_user_agent?: string | null;
   submitted_at?: string | null;
   reviewed_at?: string | null;
   review_notes?: string | null;
@@ -149,6 +154,27 @@ type UploadAction =
   | "identity"
   | "picture-delete"
   | "video-delete";
+
+type InstitutionOption = { id: string; name: string; country_code: string };
+type EducationDraft = {
+  institution_id: string; institution_name: string; country_code: string;
+  course_of_study: string; specialty: string; qualification_type: string;
+  grade: string; start_date: string; end_date: string; currently_enrolled: boolean;
+  document_public_id: string; document_name: string; document_format: string;
+};
+type CertificationDraft = { name: string; issuing_organization: string; date_obtained: string; expiry_date: string; document_public_id: string; document_name: string; document_format: string };
+type WorkDraft = { organization: string; job_title: string; employment_type: string; start_date: string; end_date: string; currently_working: boolean; description: string };
+type BackgroundApiResponse = {
+  education: Array<Partial<EducationDraft> & { institution_id?: string | null; institution_name?: string | null; country_code?: string | null; course_of_study?: string | null; qualification_type?: string | null; start_date?: string | null; end_date?: string | null; document_public_id?: string | null; document_name?: string | null; document_format?: string | null }>;
+  certifications: Array<Partial<CertificationDraft> & { name?: string | null; issuing_organization?: string | null; date_obtained?: string | null; expiry_date?: string | null; document_public_id?: string | null; document_name?: string | null; document_format?: string | null }>;
+  work_history: Array<Partial<WorkDraft> & { organization?: string | null; job_title?: string | null; employment_type?: string | null; start_date?: string | null; end_date?: string | null; description?: string | null }>;
+};
+
+const EMPTY_EDUCATION: EducationDraft = { institution_id: "", institution_name: "", country_code: "NG", course_of_study: "", specialty: "", qualification_type: "Bachelor's Degree", grade: "", start_date: "", end_date: "", currently_enrolled: false, document_public_id: "", document_name: "", document_format: "" };
+const EMPTY_CERTIFICATION: CertificationDraft = { name: "", issuing_organization: "", date_obtained: "", expiry_date: "", document_public_id: "", document_name: "", document_format: "" };
+const EMPTY_WORK: WorkDraft = { organization: "", job_title: "", employment_type: "", start_date: "", end_date: "", currently_working: false, description: "" };
+const QUALIFICATION_TYPES = ["Secondary School", "Diploma", "NCE", "OND", "HND", "Bachelor's Degree", "Postgraduate Diploma", "Master's Degree", "Doctorate", "Professional Qualification", "Other"];
+const COUNTRIES = [{"code": "AF", "name": "Afghanistan"}, {"code": "AL", "name": "Albania"}, {"code": "DZ", "name": "Algeria"}, {"code": "AS", "name": "American Samoa"}, {"code": "AD", "name": "Andorra"}, {"code": "AO", "name": "Angola"}, {"code": "AI", "name": "Anguilla"}, {"code": "AQ", "name": "Antarctica"}, {"code": "AG", "name": "Antigua and Barbuda"}, {"code": "AR", "name": "Argentina"}, {"code": "AM", "name": "Armenia"}, {"code": "AW", "name": "Aruba"}, {"code": "AU", "name": "Australia"}, {"code": "AT", "name": "Austria"}, {"code": "AZ", "name": "Azerbaijan"}, {"code": "BS", "name": "Bahamas"}, {"code": "BH", "name": "Bahrain"}, {"code": "BD", "name": "Bangladesh"}, {"code": "BB", "name": "Barbados"}, {"code": "BY", "name": "Belarus"}, {"code": "BE", "name": "Belgium"}, {"code": "BZ", "name": "Belize"}, {"code": "BJ", "name": "Benin"}, {"code": "BM", "name": "Bermuda"}, {"code": "BT", "name": "Bhutan"}, {"code": "BO", "name": "Bolivia, Plurinational State of"}, {"code": "BQ", "name": "Bonaire, Sint Eustatius and Saba"}, {"code": "BA", "name": "Bosnia and Herzegovina"}, {"code": "BW", "name": "Botswana"}, {"code": "BV", "name": "Bouvet Island"}, {"code": "BR", "name": "Brazil"}, {"code": "IO", "name": "British Indian Ocean Territory"}, {"code": "BN", "name": "Brunei Darussalam"}, {"code": "BG", "name": "Bulgaria"}, {"code": "BF", "name": "Burkina Faso"}, {"code": "BI", "name": "Burundi"}, {"code": "CV", "name": "Cabo Verde"}, {"code": "KH", "name": "Cambodia"}, {"code": "CM", "name": "Cameroon"}, {"code": "CA", "name": "Canada"}, {"code": "KY", "name": "Cayman Islands"}, {"code": "CF", "name": "Central African Republic"}, {"code": "TD", "name": "Chad"}, {"code": "CL", "name": "Chile"}, {"code": "CN", "name": "China"}, {"code": "CX", "name": "Christmas Island"}, {"code": "CC", "name": "Cocos (Keeling) Islands"}, {"code": "CO", "name": "Colombia"}, {"code": "KM", "name": "Comoros"}, {"code": "CG", "name": "Congo"}, {"code": "CD", "name": "Congo, The Democratic Republic of the"}, {"code": "CK", "name": "Cook Islands"}, {"code": "CR", "name": "Costa Rica"}, {"code": "HR", "name": "Croatia"}, {"code": "CU", "name": "Cuba"}, {"code": "CW", "name": "Curaçao"}, {"code": "CY", "name": "Cyprus"}, {"code": "CZ", "name": "Czechia"}, {"code": "CI", "name": "Côte d'Ivoire"}, {"code": "DK", "name": "Denmark"}, {"code": "DJ", "name": "Djibouti"}, {"code": "DM", "name": "Dominica"}, {"code": "DO", "name": "Dominican Republic"}, {"code": "EC", "name": "Ecuador"}, {"code": "EG", "name": "Egypt"}, {"code": "SV", "name": "El Salvador"}, {"code": "GQ", "name": "Equatorial Guinea"}, {"code": "ER", "name": "Eritrea"}, {"code": "EE", "name": "Estonia"}, {"code": "SZ", "name": "Eswatini"}, {"code": "ET", "name": "Ethiopia"}, {"code": "FK", "name": "Falkland Islands (Malvinas)"}, {"code": "FO", "name": "Faroe Islands"}, {"code": "FJ", "name": "Fiji"}, {"code": "FI", "name": "Finland"}, {"code": "FR", "name": "France"}, {"code": "GF", "name": "French Guiana"}, {"code": "PF", "name": "French Polynesia"}, {"code": "TF", "name": "French Southern Territories"}, {"code": "GA", "name": "Gabon"}, {"code": "GM", "name": "Gambia"}, {"code": "GE", "name": "Georgia"}, {"code": "DE", "name": "Germany"}, {"code": "GH", "name": "Ghana"}, {"code": "GI", "name": "Gibraltar"}, {"code": "GR", "name": "Greece"}, {"code": "GL", "name": "Greenland"}, {"code": "GD", "name": "Grenada"}, {"code": "GP", "name": "Guadeloupe"}, {"code": "GU", "name": "Guam"}, {"code": "GT", "name": "Guatemala"}, {"code": "GG", "name": "Guernsey"}, {"code": "GN", "name": "Guinea"}, {"code": "GW", "name": "Guinea-Bissau"}, {"code": "GY", "name": "Guyana"}, {"code": "HT", "name": "Haiti"}, {"code": "HM", "name": "Heard Island and McDonald Islands"}, {"code": "VA", "name": "Holy See (Vatican City State)"}, {"code": "HN", "name": "Honduras"}, {"code": "HK", "name": "Hong Kong"}, {"code": "HU", "name": "Hungary"}, {"code": "IS", "name": "Iceland"}, {"code": "IN", "name": "India"}, {"code": "ID", "name": "Indonesia"}, {"code": "IR", "name": "Iran, Islamic Republic of"}, {"code": "IQ", "name": "Iraq"}, {"code": "IE", "name": "Ireland"}, {"code": "IM", "name": "Isle of Man"}, {"code": "IL", "name": "Israel"}, {"code": "IT", "name": "Italy"}, {"code": "JM", "name": "Jamaica"}, {"code": "JP", "name": "Japan"}, {"code": "JE", "name": "Jersey"}, {"code": "JO", "name": "Jordan"}, {"code": "KZ", "name": "Kazakhstan"}, {"code": "KE", "name": "Kenya"}, {"code": "KI", "name": "Kiribati"}, {"code": "KP", "name": "Korea, Democratic People's Republic of"}, {"code": "KR", "name": "Korea, Republic of"}, {"code": "KW", "name": "Kuwait"}, {"code": "KG", "name": "Kyrgyzstan"}, {"code": "LA", "name": "Lao People's Democratic Republic"}, {"code": "LV", "name": "Latvia"}, {"code": "LB", "name": "Lebanon"}, {"code": "LS", "name": "Lesotho"}, {"code": "LR", "name": "Liberia"}, {"code": "LY", "name": "Libya"}, {"code": "LI", "name": "Liechtenstein"}, {"code": "LT", "name": "Lithuania"}, {"code": "LU", "name": "Luxembourg"}, {"code": "MO", "name": "Macao"}, {"code": "MG", "name": "Madagascar"}, {"code": "MW", "name": "Malawi"}, {"code": "MY", "name": "Malaysia"}, {"code": "MV", "name": "Maldives"}, {"code": "ML", "name": "Mali"}, {"code": "MT", "name": "Malta"}, {"code": "MH", "name": "Marshall Islands"}, {"code": "MQ", "name": "Martinique"}, {"code": "MR", "name": "Mauritania"}, {"code": "MU", "name": "Mauritius"}, {"code": "YT", "name": "Mayotte"}, {"code": "MX", "name": "Mexico"}, {"code": "FM", "name": "Micronesia, Federated States of"}, {"code": "MD", "name": "Moldova, Republic of"}, {"code": "MC", "name": "Monaco"}, {"code": "MN", "name": "Mongolia"}, {"code": "ME", "name": "Montenegro"}, {"code": "MS", "name": "Montserrat"}, {"code": "MA", "name": "Morocco"}, {"code": "MZ", "name": "Mozambique"}, {"code": "MM", "name": "Myanmar"}, {"code": "NA", "name": "Namibia"}, {"code": "NR", "name": "Nauru"}, {"code": "NP", "name": "Nepal"}, {"code": "NL", "name": "Netherlands"}, {"code": "NC", "name": "New Caledonia"}, {"code": "NZ", "name": "New Zealand"}, {"code": "NI", "name": "Nicaragua"}, {"code": "NE", "name": "Niger"}, {"code": "NG", "name": "Nigeria"}, {"code": "NU", "name": "Niue"}, {"code": "NF", "name": "Norfolk Island"}, {"code": "MK", "name": "North Macedonia"}, {"code": "MP", "name": "Northern Mariana Islands"}, {"code": "NO", "name": "Norway"}, {"code": "OM", "name": "Oman"}, {"code": "PK", "name": "Pakistan"}, {"code": "PW", "name": "Palau"}, {"code": "PS", "name": "Palestine, State of"}, {"code": "PA", "name": "Panama"}, {"code": "PG", "name": "Papua New Guinea"}, {"code": "PY", "name": "Paraguay"}, {"code": "PE", "name": "Peru"}, {"code": "PH", "name": "Philippines"}, {"code": "PN", "name": "Pitcairn"}, {"code": "PL", "name": "Poland"}, {"code": "PT", "name": "Portugal"}, {"code": "PR", "name": "Puerto Rico"}, {"code": "QA", "name": "Qatar"}, {"code": "RO", "name": "Romania"}, {"code": "RU", "name": "Russian Federation"}, {"code": "RW", "name": "Rwanda"}, {"code": "RE", "name": "Réunion"}, {"code": "BL", "name": "Saint Barthélemy"}, {"code": "SH", "name": "Saint Helena, Ascension and Tristan da Cunha"}, {"code": "KN", "name": "Saint Kitts and Nevis"}, {"code": "LC", "name": "Saint Lucia"}, {"code": "MF", "name": "Saint Martin (French part)"}, {"code": "PM", "name": "Saint Pierre and Miquelon"}, {"code": "VC", "name": "Saint Vincent and the Grenadines"}, {"code": "WS", "name": "Samoa"}, {"code": "SM", "name": "San Marino"}, {"code": "ST", "name": "Sao Tome and Principe"}, {"code": "SA", "name": "Saudi Arabia"}, {"code": "SN", "name": "Senegal"}, {"code": "RS", "name": "Serbia"}, {"code": "SC", "name": "Seychelles"}, {"code": "SL", "name": "Sierra Leone"}, {"code": "SG", "name": "Singapore"}, {"code": "SX", "name": "Sint Maarten (Dutch part)"}, {"code": "SK", "name": "Slovakia"}, {"code": "SI", "name": "Slovenia"}, {"code": "SB", "name": "Solomon Islands"}, {"code": "SO", "name": "Somalia"}, {"code": "ZA", "name": "South Africa"}, {"code": "GS", "name": "South Georgia and the South Sandwich Islands"}, {"code": "SS", "name": "South Sudan"}, {"code": "ES", "name": "Spain"}, {"code": "LK", "name": "Sri Lanka"}, {"code": "SD", "name": "Sudan"}, {"code": "SR", "name": "Suriname"}, {"code": "SJ", "name": "Svalbard and Jan Mayen"}, {"code": "SE", "name": "Sweden"}, {"code": "CH", "name": "Switzerland"}, {"code": "SY", "name": "Syrian Arab Republic"}, {"code": "TW", "name": "Taiwan, Province of China"}, {"code": "TJ", "name": "Tajikistan"}, {"code": "TZ", "name": "Tanzania, United Republic of"}, {"code": "TH", "name": "Thailand"}, {"code": "TL", "name": "Timor-Leste"}, {"code": "TG", "name": "Togo"}, {"code": "TK", "name": "Tokelau"}, {"code": "TO", "name": "Tonga"}, {"code": "TT", "name": "Trinidad and Tobago"}, {"code": "TN", "name": "Tunisia"}, {"code": "TM", "name": "Turkmenistan"}, {"code": "TC", "name": "Turks and Caicos Islands"}, {"code": "TV", "name": "Tuvalu"}, {"code": "TR", "name": "Türkiye"}, {"code": "UG", "name": "Uganda"}, {"code": "UA", "name": "Ukraine"}, {"code": "AE", "name": "United Arab Emirates"}, {"code": "GB", "name": "United Kingdom"}, {"code": "US", "name": "United States"}, {"code": "UM", "name": "United States Minor Outlying Islands"}, {"code": "UY", "name": "Uruguay"}, {"code": "UZ", "name": "Uzbekistan"}, {"code": "VU", "name": "Vanuatu"}, {"code": "VE", "name": "Venezuela, Bolivarian Republic of"}, {"code": "VN", "name": "Viet Nam"}, {"code": "VG", "name": "Virgin Islands, British"}, {"code": "VI", "name": "Virgin Islands, U.S."}, {"code": "WF", "name": "Wallis and Futuna"}, {"code": "EH", "name": "Western Sahara"}, {"code": "YE", "name": "Yemen"}, {"code": "ZM", "name": "Zambia"}, {"code": "ZW", "name": "Zimbabwe"}, {"code": "AX", "name": "Åland Islands"}];
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
@@ -518,6 +544,37 @@ function LocationSelect({
   );
 }
 
+function BackgroundUploadProgress({
+  uploading,
+  progress,
+  fileName,
+  error,
+}: {
+  uploading: boolean;
+  progress: number | undefined;
+  fileName: string;
+  error?: string;
+}) {
+  if (error) {
+    return <p className="mt-2 text-xs text-rose-700" role="alert">{error} Select the file again to retry.</p>;
+  }
+  if (uploading) {
+    return (
+      <div className="mt-2 space-y-1.5" role="status" aria-live="polite">
+        <div className="flex items-center justify-between text-xs text-slate-600">
+          <span className="inline-flex items-center gap-1.5"><Loader2 size={13} className="animate-spin" /> Uploading {fileName}…</span>
+          <span>{progress ?? 0}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full rounded-full bg-[#00AFA0] transition-[width] duration-200" style={{ width: `${progress ?? 0}%` }} />
+        </div>
+        <p className="text-xs text-slate-500">Please keep this page open until the upload finishes.</p>
+      </div>
+    );
+  }
+  return null;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Page                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -529,6 +586,11 @@ export default function TutorOnboardingPage() {
   /* Profile fields */
   const [bio, setBio] = useState("");
   const [qualifications, setQualifications] = useState("");
+  const [education, setEducation] = useState<EducationDraft[]>([]);
+  const [certifications, setCertifications] = useState<CertificationDraft[]>([]);
+  const [workHistory, setWorkHistory] = useState<WorkDraft[]>([]);
+  const [institutionOptions, setInstitutionOptions] = useState<Record<number, InstitutionOption[]>>({});
+  const [institutionSearchBusy, setInstitutionSearchBusy] = useState<number | null>(null);
   const [rate, setRate] = useState("");
   const [years, setYears] = useState("0");
   const [languages, setLanguages] = useState("English");
@@ -548,6 +610,9 @@ export default function TutorOnboardingPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState<UploadAction[]>([]);
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [backgroundUploadProgress, setBackgroundUploadProgress] = useState<Record<string, number>>({});
+  const [backgroundUploading, setBackgroundUploading] = useState<string[]>([]);
+  const [backgroundUploadErrors, setBackgroundUploadErrors] = useState<Record<string, string>>({});
 
   function startUpload(action: UploadAction) {
     setUploading((current) =>
@@ -600,6 +665,12 @@ export default function TutorOnboardingPage() {
   const [identityDocumentType, setIdentityDocumentType] =
     useState<IdentityDocumentType>("NATIONAL_ID");
   const [acceptNda, setAcceptNda] = useState(false);
+  const [ndaContent, setNdaContent] = useState("");
+  const [ndaVersion, setNdaVersion] = useState("v1");
+  const [acceptingNda, setAcceptingNda] = useState(false);
+  const [ndaScrolledToEnd, setNdaScrolledToEnd] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftSaveStatus, setDraftSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const [verification, setVerification] = useState<VerificationResponse | null>(
     null,
   );
@@ -610,6 +681,12 @@ export default function TutorOnboardingPage() {
   ]);
 
   const pictureInputRef = useRef<HTMLInputElement>(null);
+  const [pendingPictureFile, setPendingPictureFile] = useState<File | null>(null);
+  const [picturePreviewUrl, setPicturePreviewUrl] = useState<string | null>(null);
+  const [pictureZoom, setPictureZoom] = useState(1);
+  const [pictureRotation, setPictureRotation] = useState(0);
+  const [pictureConfirmations, setPictureConfirmations] = useState([false, false, false]);
+  const [processingPicture, setProcessingPicture] = useState(false);
 
   /* ------------------------------------------------------------------------ */
   /* Derived values                                                           */
@@ -1026,6 +1103,9 @@ export default function TutorOnboardingPage() {
         api<TutorReferee[]>("/verification/tutor/referees"),
         fetchLocations({ location_type: "STATE" }),
         api<CurrentUserResponse>("/auth/me"),
+        api<BackgroundApiResponse>("/tutors/profile/background"),
+        api<{ payload: Record<string, any>; updated_at: string | null }>("/tutors/profile/draft"),
+        api<{ version: string; content: string }>("/verification/tutor/nda"),
       ]);
 
       if (!active) return;
@@ -1037,6 +1117,9 @@ export default function TutorOnboardingPage() {
         refereeResult,
         statesResult,
         currentUserResult,
+        backgroundResult,
+        draftResult,
+        ndaResult,
       ] = results;
 
       if (subjectResult.status === "fulfilled") {
@@ -1079,8 +1162,35 @@ export default function TutorOnboardingPage() {
         }
       }
 
+      if (backgroundResult.status === "fulfilled") {
+        const background = backgroundResult.value;
+        setEducation((background.education ?? []).map((item) => ({
+          institution_id: item.institution_id ?? "", institution_name: item.institution_name ?? "", country_code: item.country_code ?? "NG",
+          course_of_study: item.course_of_study ?? "", specialty: item.specialty ?? "", qualification_type: item.qualification_type ?? "Other",
+          grade: item.grade ?? "", start_date: item.start_date ?? "", end_date: item.end_date ?? "", currently_enrolled: Boolean(item.currently_enrolled),
+          document_public_id: item.document_public_id ?? "", document_name: item.document_name ?? "", document_format: item.document_format ?? "",
+        })));
+        setCertifications((background.certifications ?? []).map((item) => ({ name: item.name ?? "", issuing_organization: item.issuing_organization ?? "", date_obtained: item.date_obtained ?? "", expiry_date: item.expiry_date ?? "", document_public_id: item.document_public_id ?? "", document_name: item.document_name ?? "", document_format: item.document_format ?? "" })));
+        setWorkHistory((background.work_history ?? []).map((item) => ({ organization: item.organization ?? "", job_title: item.job_title ?? "", employment_type: item.employment_type ?? "", start_date: item.start_date ?? "", end_date: item.end_date ?? "", currently_working: Boolean(item.currently_working), description: item.description ?? "" })));
+      }
+
+      if (ndaResult.status === "fulfilled") {
+        setNdaVersion(ndaResult.value.version);
+        setNdaContent(ndaResult.value.content);
+        setNdaScrolledToEnd(false);
+      } else {
+        toast.error("Could not load the current tutor NDA.");
+      }
+
       if (verificationResult.status === "fulfilled") {
         setVerification(verificationResult.value);
+        setAcceptNda(Boolean(
+          verificationResult.value.nda_accepted_at &&
+          ndaResult.status === "fulfilled" &&
+          verificationResult.value.nda_version === ndaResult.value.version &&
+          verificationResult.value.nda_content === ndaResult.value.content
+        ));
+
         if (
           [
             "PENDING_REVIEW",
@@ -1118,6 +1228,33 @@ export default function TutorOnboardingPage() {
         toast.error("Could not load your account phone number.");
       }
 
+      if (draftResult.status === "fulfilled" && draftResult.value.payload) {
+        const draft = draftResult.value.payload;
+        if (typeof draft.bio === "string") setBio(draft.bio);
+        if (typeof draft.qualifications === "string") setQualifications(draft.qualifications);
+        if (Array.isArray(draft.education)) setEducation(draft.education);
+        if (Array.isArray(draft.certifications)) setCertifications(draft.certifications);
+        if (Array.isArray(draft.workHistory)) setWorkHistory(draft.workHistory);
+        if (typeof draft.rate === "string") setRate(draft.rate);
+        if (typeof draft.years === "string") setYears(draft.years);
+        if (typeof draft.languages === "string") setLanguages(draft.languages);
+        if (Array.isArray(draft.ages)) setAges(draft.ages);
+        if (Array.isArray(draft.modes)) setModes(draft.modes);
+        if (typeof draft.area === "string") setArea(draft.area);
+        if (typeof draft.phoneNumber === "string") setPhoneNumber(draft.phoneNumber);
+        if (Array.isArray(draft.subjectIds)) setSubjectIds(draft.subjectIds);
+        if (Array.isArray(draft.locationIds)) { setLocationIds(draft.locationIds); void hydrateSavedLocations(draft.locationIds); }
+        if (typeof draft.selectedStateId === "string") setSelectedStateId(draft.selectedStateId);
+        if (typeof draft.selectedLgaId === "string") setSelectedLgaId(draft.selectedLgaId);
+        if (typeof draft.selectedCommunityId === "string") setSelectedCommunityId(draft.selectedCommunityId);
+        if (typeof draft.newCommunityName === "string") setNewCommunityName(draft.newCommunityName);
+        if (typeof draft.identityDocumentType === "string") setIdentityDocumentType(draft.identityDocumentType as IdentityDocumentType);
+        if (Array.isArray(draft.refereeDrafts)) setRefereeDrafts(draft.refereeDrafts);
+        if (draft.currentStep === 1 || draft.currentStep === 2 || draft.currentStep === 3) setCurrentStep(draft.currentStep);
+        if (typeof draft.stage2Completed === "boolean") setStage2Completed(draft.stage2Completed);
+      }
+
+      setDraftReady(true);
       setLoading(false);
     }
 
@@ -1127,6 +1264,32 @@ export default function TutorOnboardingPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!draftReady || loading) return;
+    if (verification?.status === "PENDING_REVIEW" || verification?.status === "APPROVED") return;
+    const payload = {
+      currentStep, stage2Completed, bio, qualifications, education, certifications,
+      workHistory, rate, years, languages, ages, modes, area, phoneNumber,
+      subjectIds, locationIds, selectedStateId, selectedLgaId,
+      selectedCommunityId, newCommunityName, identityDocumentType, refereeDrafts,
+    };
+    setDraftSaveStatus("saving");
+    const timeout = window.setTimeout(() => {
+      void api("/tutors/profile/draft", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }).then(() => setDraftSaveStatus("saved"))
+        .catch(() => setDraftSaveStatus("error"));
+    }, 1000);
+    return () => window.clearTimeout(timeout);
+  }, [
+    draftReady, loading, verification?.status, currentStep, stage2Completed, bio,
+    qualifications, education, certifications, workHistory, rate, years,
+    languages, ages, modes, area, phoneNumber, subjectIds, locationIds,
+    selectedStateId, selectedLgaId, selectedCommunityId, newCommunityName,
+    identityDocumentType, refereeDrafts,
+  ]);
 
   /* ------------------------------------------------------------------------ */
   /* Selection helpers                                                        */
@@ -1210,47 +1373,85 @@ export default function TutorOnboardingPage() {
   /* Profile picture                                                          */
   /* ------------------------------------------------------------------------ */
 
-  async function handleProfilePicture(event: ChangeEvent<HTMLInputElement>) {
+  function handleProfilePicture(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-
     if (!file) return;
-
     if (!exists) {
       toast.error("Create your tutor profile before uploading a picture.");
       return;
     }
+    if (!validateFile(file, ["image/jpeg", "image/png", "image/webp"], 5 * 1024 * 1024, "profile picture")) return;
+    if (picturePreviewUrl) URL.revokeObjectURL(picturePreviewUrl);
+    setPendingPictureFile(file);
+    setPicturePreviewUrl(URL.createObjectURL(file));
+    setPictureZoom(1);
+    setPictureRotation(0);
+    setPictureConfirmations([false, false, false]);
+  }
 
-    if (
-      !validateFile(
-        file,
-        ["image/jpeg", "image/png", "image/webp"],
-        5 * 1024 * 1024,
-        "profile picture",
-      )
-    ) {
+  function closePictureEditor() {
+    if (picturePreviewUrl) URL.revokeObjectURL(picturePreviewUrl);
+    setPendingPictureFile(null);
+    setPicturePreviewUrl(null);
+    setPictureZoom(1);
+    setPictureRotation(0);
+    setPictureConfirmations([false, false, false]);
+  }
+
+  async function createCroppedProfilePicture(file: File) {
+    const image = new Image();
+    const sourceUrl = URL.createObjectURL(file);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("Could not read the selected image."));
+        image.src = sourceUrl;
+      });
+      const canvas = document.createElement("canvas");
+      const size = 1024;
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Your browser could not prepare the photo.");
+      const radians = (pictureRotation * Math.PI) / 180;
+      const rotatedWidth = Math.abs(image.naturalWidth * Math.cos(radians)) + Math.abs(image.naturalHeight * Math.sin(radians));
+      const rotatedHeight = Math.abs(image.naturalHeight * Math.cos(radians)) + Math.abs(image.naturalWidth * Math.sin(radians));
+      const scale = Math.max(size / rotatedWidth, size / rotatedHeight) * pictureZoom;
+      context.translate(size / 2, size / 2);
+      context.rotate(radians);
+      context.scale(scale, scale);
+      context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((result) => result ? resolve(result) : reject(new Error("Could not crop the selected photo.")), "image/jpeg", 0.92);
+      });
+      return new File([blob], "tutor-profile-picture.jpg", { type: "image/jpeg", lastModified: Date.now() });
+    } finally {
+      URL.revokeObjectURL(sourceUrl);
+    }
+  }
+
+  async function confirmProfilePicture() {
+    if (!pendingPictureFile || pictureConfirmations.some((checked) => !checked)) {
+      toast.error("Please confirm all three photo-quality checks before uploading.");
       return;
     }
-
+    setProcessingPicture(true);
     try {
-      const response = await uploadFile(
-        "/tutors/profile/picture",
-        file,
-        "picture",
-      );
-
+      const croppedFile = await createCroppedProfilePicture(pendingPictureFile);
+      const response = await uploadFile("/tutors/profile/picture", croppedFile, "picture");
       if (response.profile_picture_url) {
         setProfilePictureUrl(response.profile_picture_url);
       } else {
         const profile = await api<TutorProfile>("/tutors/profile");
         setProfilePictureUrl(profile.profile_picture_url ?? null);
       }
-
       toast.success("Profile picture uploaded.");
+      closePictureEditor();
     } catch (error) {
-      toast.error(
-        getErrorMessage(error, "Could not upload your profile picture."),
-      );
+      toast.error(getErrorMessage(error, "Could not upload your profile picture."));
+    } finally {
+      setProcessingPicture(false);
     }
   }
 
@@ -1480,6 +1681,108 @@ export default function TutorOnboardingPage() {
     }
   }
 
+  async function searchInstitutions(index: number, query: string, countryCode: string) {
+    if (query.trim().length < 2) { setInstitutionOptions((current) => ({ ...current, [index]: [] })); return; }
+    setInstitutionSearchBusy(index);
+    try {
+      const params = new URLSearchParams({ q: query.trim(), country_code: countryCode });
+      const options = await api<InstitutionOption[]>(`/tutors/profile/institutions?${params.toString()}`);
+      setInstitutionOptions((current) => ({ ...current, [index]: options }));
+    } catch { setInstitutionOptions((current) => ({ ...current, [index]: [] })); }
+    finally { setInstitutionSearchBusy((current) => current === index ? null : current); }
+  }
+
+  async function uploadBackgroundDocument(
+    file: File,
+    uploadKey: string,
+  ): Promise<{ public_id: string; file_name: string; format: string }> {
+    if (!validateFile(file, ["application/pdf", "image/jpeg", "image/png"], 10 * 1024 * 1024, "document")) {
+      throw new Error("Choose a valid document.");
+    }
+    const form = new FormData();
+    form.append("file", file);
+    setBackgroundUploading((current) => current.includes(uploadKey) ? current : [...current, uploadKey]);
+    setBackgroundUploadErrors((current) => ({ ...current, [uploadKey]: "" }));
+    setBackgroundUploadProgress((current) => ({ ...current, [uploadKey]: 0 }));
+    try {
+      const uploaded = await uploadWithProgress<{ public_id: string; file_name: string; format: string }>(
+        "/tutors/profile/background/documents",
+        form,
+        (percentage) => setBackgroundUploadProgress((current) => ({ ...current, [uploadKey]: percentage })),
+      );
+      return uploaded;
+    } catch (error) {
+      const message = getErrorMessage(error, "Upload failed.");
+      setBackgroundUploadErrors((current) => ({ ...current, [uploadKey]: message }));
+      throw error;
+    } finally {
+      setBackgroundUploading((current) => current.filter((key) => key !== uploadKey));
+    }
+  }
+
+  async function suggestInstitution(index: number) {
+    const item = education[index];
+    if (!item || item.institution_name.trim().length < 2) { toast.error("Enter the institution name first."); return; }
+    try {
+      const result = await api<{ id: string; status: string; message: string }>("/tutors/profile/institutions/suggest", { method: "POST", body: JSON.stringify({ name: item.institution_name.trim(), country_code: item.country_code }) });
+      if (result.status === "APPROVED") setEducation((current) => current.map((row, i) => i === index ? { ...row, institution_id: result.id } : row));
+      toast.success(result.message);
+    } catch (error) { toast.error(getErrorMessage(error, "Could not submit institution suggestion.")); }
+  }
+
+  async function acceptCurrentNda() {
+    if (!ndaContent || !ndaVersion) {
+      toast.error("The current NDA could not be loaded. Please refresh and try again.");
+      return;
+    }
+    if (!ndaScrolledToEnd) {
+      toast.error("Scroll through the complete NDA before accepting it.");
+      return;
+    }
+    setAcceptingNda(true);
+    try {
+      const accepted = await api<VerificationResponse>("/verification/tutor/nda/accept", {
+        method: "POST",
+        body: JSON.stringify({ version: ndaVersion }),
+      });
+      setVerification(accepted);
+      setAcceptNda(Boolean(accepted.nda_accepted_at));
+      toast.success("Your NDA acceptance has been recorded.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Could not record your NDA acceptance."));
+    } finally {
+      setAcceptingNda(false);
+    }
+  }
+
+  async function saveBackground() {
+    // Incomplete entries remain in the server-side onboarding draft. Only
+    // complete records are promoted into the persistent background tables.
+    const validEducation = education.filter((item) =>
+      item.institution_name.trim() &&
+      item.course_of_study.trim() &&
+      item.start_date &&
+      item.qualification_type &&
+      item.document_public_id &&
+      (item.currently_enrolled || item.end_date)
+    );
+    const validCertifications = certifications.filter((item) => item.name.trim());
+    const validWork = workHistory.filter((item) =>
+      item.organization.trim() &&
+      item.job_title.trim() &&
+      item.start_date &&
+      (item.currently_working || item.end_date)
+    );
+    try {
+      await api("/tutors/profile/background", { method: "PUT", body: JSON.stringify({
+        education: validEducation.map((item) => ({ ...item, end_date: item.currently_enrolled ? null : item.end_date, specialty: item.specialty || null, grade: item.grade || null, institution_id: item.institution_id || null, document_public_id: item.document_public_id || null, document_name: item.document_name || null, document_format: item.document_format || null })),
+        certifications: validCertifications.map((item) => ({ ...item, issuing_organization: item.issuing_organization || null, date_obtained: item.date_obtained || null, expiry_date: item.expiry_date || null, document_public_id: item.document_public_id || null, document_name: item.document_name || null, document_format: item.document_format || null })),
+        work_history: validWork.map((item) => ({ ...item, end_date: item.currently_working ? null : item.end_date, employment_type: item.employment_type || null, description: item.description || null })),
+      }) });
+      return true;
+    } catch (error) { toast.error(getErrorMessage(error, "Could not save education and professional background.")); return false; }
+  }
+
   /* ------------------------------------------------------------------------ */
   /* Step 1: Save profile                                                     */
   /* ------------------------------------------------------------------------ */
@@ -1588,6 +1891,9 @@ export default function TutorOnboardingPage() {
       });
       setCatalogTouched(false);
 
+      const backgroundSaved = await saveBackground();
+      if (!backgroundSaved) throw new Error("Please review your education and professional background.");
+
       // Phone number is stored on the authenticated User, not TutorProfile.
       // Do not call this endpoint when the number has not changed: doing so
       // would unnecessarily reset the phone verification flag.
@@ -1661,6 +1967,12 @@ export default function TutorOnboardingPage() {
 
       setVerification(response);
       setStage2Completed(true);
+      try {
+        await api("/tutors/profile/draft", { method: "DELETE" });
+        setDraftReady(false);
+      } catch {
+        // Submission is already complete; a stale draft is harmless and can be overwritten later.
+      }
       setAcceptNda(false);
       toast.success("Your verification has been submitted for review.");
     } catch (error) {
@@ -1751,6 +2063,11 @@ export default function TutorOnboardingPage() {
         </div>
       ) : (
         <div className="mx-auto max-w-4xl space-y-6">
+          <div className="flex justify-end">
+            <p className="text-xs text-slate-500" aria-live="polite">
+              {draftSaveStatus === "saving" ? "Saving your progress…" : draftSaveStatus === "error" ? "Draft could not be saved. Check your connection." : "Your progress is saved automatically."}
+            </p>
+          </div>
           <StepIndicator
             currentStep={currentStep}
             onStepChange={(step) => {
@@ -1852,16 +2169,40 @@ export default function TutorOnboardingPage() {
                     </Field>
 
                     <Field label="Qualifications and expertise">
-                      <Textarea
-                        value={qualifications}
-                        onChange={(event) =>
-                          setQualifications(event.target.value)
-                        }
-                        rows={4}
-                        maxLength={5000}
-                        placeholder="List relevant qualifications, certifications, professional experience or areas of expertise."
-                      />
+                      <Textarea value={qualifications} onChange={(event) => setQualifications(event.target.value)} rows={4} maxLength={5000} placeholder="A short summary of your qualifications and areas of expertise." />
                     </Field>
+
+                    <section className="space-y-4 border-t border-slate-100 pt-6">
+                      <div><h3 className="font-semibold text-[#102A56]">Education history</h3><p className="text-sm text-slate-500">Add the institutions and programmes you have attended. Upload a certificate of completion or statement of result for each completed qualification.</p></div>
+                      {education.map((item, index) => <div key={index} className="space-y-3 rounded-xl border border-slate-200 p-4">
+                        <div className="flex items-center justify-between"><p className="font-medium text-slate-800">Education {index + 1}</p><Button type="button" variant="ghost" size="sm" disabled={backgroundUploading.some((key) => key.startsWith("education-"))} onClick={() => setEducation((rows) => rows.filter((_, i) => i !== index))}><Trash2 size={15} /> Remove</Button></div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Field label="Institution name"><Input value={item.institution_name} placeholder="Search or enter institution" onChange={(e) => { const value=e.target.value; setEducation((rows)=>rows.map((r,i)=>i===index?{...r,institution_name:value,institution_id:""}:r)); void searchInstitutions(index,value,item.country_code); }} />{institutionSearchBusy===index && <p className="text-xs text-slate-500">Searching institutions…</p>}{(institutionOptions[index]??[]).length>0 && <div className="max-h-36 overflow-auto rounded-md border border-slate-200">{institutionOptions[index].map((option)=><button type="button" key={option.id} className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={()=>{setEducation((rows)=>rows.map((r,i)=>i===index?{...r,institution_id:option.id,institution_name:option.name,country_code:option.country_code}:r));setInstitutionOptions((rows)=>({...rows,[index]:[]}));}}>{option.name}</button>)}</div>}<button type="button" className="mt-1 text-xs font-medium text-[#1769D2]" onClick={()=>void suggestInstitution(index)}>Can’t find it? Suggest this institution</button></Field>
+                          <Field label="Country"><select className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" value={item.country_code} onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,country_code:e.target.value,institution_id:""}:r))}>{COUNTRIES.map((c)=><option key={c.code} value={c.code}>{c.name}</option>)}</select></Field>
+                          <Field label="Course of study"><Input value={item.course_of_study} onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,course_of_study:e.target.value}:r))} placeholder="e.g. Mathematics" /></Field>
+                          <Field label="Specialty / area of focus"><Input value={item.specialty} onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,specialty:e.target.value}:r))} placeholder="Optional" /></Field>
+                          <Field label="Qualification / programme"><div className="space-y-2"><select className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm" value={QUALIFICATION_TYPES.includes(item.qualification_type) ? item.qualification_type : "Other"} onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,qualification_type:e.target.value}:r))}>{QUALIFICATION_TYPES.map((q)=><option key={q}>{q}</option>)}</select>{item.qualification_type === "Other" && <Input value={item.qualification_type === "Other" ? "" : item.qualification_type} placeholder="Specify qualification or programme" onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,qualification_type:e.target.value || "Other"}:r))}/>}</div></Field>
+                          <Field label="Grade / result"><Input value={item.grade} onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,grade:e.target.value}:r))} placeholder="e.g. Second Class Upper, 4.2/5.0" /></Field>
+                          <Field label="From"><Input type="date" value={item.start_date} onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,start_date:e.target.value}:r))} /></Field>
+                          <Field label="To"><Input type="date" disabled={item.currently_enrolled} value={item.end_date} onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,end_date:e.target.value}:r))} /></Field>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={item.currently_enrolled} onChange={(e)=>setEducation((rows)=>rows.map((r,i)=>i===index?{...r,currently_enrolled:e.target.checked,end_date:e.target.checked?"":r.end_date}:r))} /> Currently enrolled</label>
+                        <Field label="Certificate of completion / statement of result"><Input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={backgroundUploading.includes(`education-${index}`)} onChange={async(e)=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;try{const uploaded=await uploadBackgroundDocument(file,`education-${index}`);setEducation((rows)=>rows.map((r,i)=>i===index?{...r,document_public_id:uploaded.public_id,document_name:uploaded.file_name,document_format:uploaded.format}:r));toast.success("Education document uploaded securely.");}catch(err){toast.error(getErrorMessage(err,"Could not upload document."));}}} /><BackgroundUploadProgress uploading={backgroundUploading.includes(`education-${index}`)} progress={backgroundUploadProgress[`education-${index}`]} fileName={item.document_name || "education document"} error={backgroundUploadErrors[`education-${index}`]} />{item.document_name && !backgroundUploading.includes(`education-${index}`) && <p className="mt-2 flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 size={13} /> Uploaded: {item.document_name}</p>}</Field>
+                      </div>)}
+                      <Button type="button" variant="outline" onClick={()=>setEducation((rows)=>[...rows,{...EMPTY_EDUCATION}])}><Plus size={15}/> Add institution</Button>
+                    </section>
+
+                    <section className="space-y-4 border-t border-slate-100 pt-6">
+                      <div><h3 className="font-semibold text-[#102A56]">Professional certifications <span className="text-xs font-normal text-slate-400">Optional</span></h3><p className="text-sm text-slate-500">Add relevant professional or teaching certifications to strengthen your profile.</p></div>
+                      {certifications.map((item,index)=><div key={index} className="space-y-3 rounded-xl border border-slate-200 p-4"><div className="flex justify-between"><p className="font-medium">Certification {index+1}</p><Button type="button" variant="ghost" size="sm" disabled={backgroundUploading.some((key) => key.startsWith("certification-"))} onClick={()=>setCertifications((rows)=>rows.filter((_,i)=>i!==index))}><Trash2 size={15}/> Remove</Button></div><div className="grid gap-3 sm:grid-cols-2"><Field label="Certification name"><Input value={item.name} onChange={(e)=>setCertifications((rows)=>rows.map((r,i)=>i===index?{...r,name:e.target.value}:r))}/></Field><Field label="Issuing organisation"><Input value={item.issuing_organization} onChange={(e)=>setCertifications((rows)=>rows.map((r,i)=>i===index?{...r,issuing_organization:e.target.value}:r))}/></Field><Field label="Date obtained"><Input type="date" value={item.date_obtained} onChange={(e)=>setCertifications((rows)=>rows.map((r,i)=>i===index?{...r,date_obtained:e.target.value}:r))}/></Field><Field label="Expiry date (if applicable)"><Input type="date" value={item.expiry_date} onChange={(e)=>setCertifications((rows)=>rows.map((r,i)=>i===index?{...r,expiry_date:e.target.value}:r))}/></Field></div><Field label="Certificate upload (optional)"><Input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={backgroundUploading.includes(`certification-${index}`)} onChange={async(e)=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;try{const uploaded=await uploadBackgroundDocument(file,`certification-${index}`);setCertifications((rows)=>rows.map((r,i)=>i===index?{...r,document_public_id:uploaded.public_id,document_name:uploaded.file_name,document_format:uploaded.format}:r));toast.success("Certification uploaded.");}catch(err){toast.error(getErrorMessage(err,"Could not upload certification."));}}}/><BackgroundUploadProgress uploading={backgroundUploading.includes(`certification-${index}`)} progress={backgroundUploadProgress[`certification-${index}`]} fileName={item.document_name || "certification"} error={backgroundUploadErrors[`certification-${index}`]} />{item.document_name&&!backgroundUploading.includes(`certification-${index}`)&&<p className="mt-2 flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 size={13}/> Uploaded: {item.document_name}</p>}</Field></div>)}
+                      <Button type="button" variant="outline" onClick={()=>setCertifications((rows)=>[...rows,{...EMPTY_CERTIFICATION}])}><Plus size={15}/> Add certification</Button>
+                    </section>
+
+                    <section className="space-y-4 border-t border-slate-100 pt-6">
+                      <div><h3 className="font-semibold text-[#102A56]">Work history <span className="text-xs font-normal text-slate-400">Optional</span></h3><p className="text-sm text-slate-500">Include previous teaching or professional experience, if any. You can skip this section.</p></div>
+                      {workHistory.map((item,index)=><div key={index} className="space-y-3 rounded-xl border border-slate-200 p-4"><div className="flex justify-between"><p className="font-medium">Work experience {index+1}</p><Button type="button" variant="ghost" size="sm" onClick={()=>setWorkHistory((rows)=>rows.filter((_,i)=>i!==index))}><Trash2 size={15}/> Remove</Button></div><div className="grid gap-3 sm:grid-cols-2"><Field label="Organisation / employer"><Input value={item.organization} onChange={(e)=>setWorkHistory((rows)=>rows.map((r,i)=>i===index?{...r,organization:e.target.value}:r))}/></Field><Field label="Job title"><Input value={item.job_title} onChange={(e)=>setWorkHistory((rows)=>rows.map((r,i)=>i===index?{...r,job_title:e.target.value}:r))}/></Field><Field label="Employment type"><Input value={item.employment_type} onChange={(e)=>setWorkHistory((rows)=>rows.map((r,i)=>i===index?{...r,employment_type:e.target.value}:r))} placeholder="e.g. Full-time, Part-time, Contract"/></Field><Field label="From"><Input type="date" value={item.start_date} onChange={(e)=>setWorkHistory((rows)=>rows.map((r,i)=>i===index?{...r,start_date:e.target.value}:r))}/></Field><Field label="To"><Input type="date" disabled={item.currently_working} value={item.end_date} onChange={(e)=>setWorkHistory((rows)=>rows.map((r,i)=>i===index?{...r,end_date:e.target.value}:r))}/></Field></div><label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={item.currently_working} onChange={(e)=>setWorkHistory((rows)=>rows.map((r,i)=>i===index?{...r,currently_working:e.target.checked,end_date:e.target.checked?"":r.end_date}:r))}/> Currently working here</label><Field label="Responsibilities / description"><Textarea rows={3} value={item.description} onChange={(e)=>setWorkHistory((rows)=>rows.map((r,i)=>i===index?{...r,description:e.target.value}:r))}/></Field></div>)}
+                      <Button type="button" variant="outline" onClick={()=>setWorkHistory((rows)=>[...rows,{...EMPTY_WORK}])}><Plus size={15}/> Add work history</Button>
+                    </section>
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Field label="Monthly tutoring fee (₦)">
@@ -2381,6 +2722,66 @@ export default function TutorOnboardingPage() {
                 </div>
               )}
 
+              {/* Profile picture editor */}
+              {picturePreviewUrl && (
+                <div className="fixed inset-0 z-[100] flex flex-col bg-white">
+                  <div className="flex shrink-0 items-center justify-between border-b px-5 py-5 sm:px-8">
+                    <div className="flex-1 text-center">
+                      <h2 className="text-2xl font-bold text-slate-900">Edit photo</h2>
+                      <p className="mt-1 text-sm text-slate-600">Make sure your face is clearly inside the circle</p>
+                    </div>
+                    <button type="button" aria-label="Close photo editor" onClick={closePictureEditor} disabled={processingPicture} className="rounded-full p-2 text-slate-700 hover:bg-slate-100">
+                      <X size={25} />
+                    </button>
+                  </div>
+
+                  <div className="flex min-h-0 flex-1 items-center justify-center bg-black">
+                    <div className="relative aspect-square max-h-full w-full max-w-[min(100vw,70vh)] overflow-hidden bg-black">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={picturePreviewUrl} alt="Adjust your profile picture" className="absolute inset-0 h-full w-full object-cover" style={{ transform: `scale(${pictureZoom}) rotate(${pictureRotation}deg)` }} />
+                      <div className="pointer-events-none absolute inset-0">
+                        <div className="absolute inset-0" style={{ background: "radial-gradient(circle at center, transparent 0 49%, rgba(0,0,0,.58) 50% 100%)" }} />
+                        <div className="absolute left-1/2 top-1/2 aspect-square w-[76%] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 border-t bg-white px-5 py-5 sm:px-8">
+                    <div className="mx-auto flex max-w-2xl items-center gap-5">
+                      <span className="text-sm text-slate-500">Zoom</span>
+                      <input aria-label="Zoom photo" type="range" min="1" max="3" step="0.05" value={pictureZoom} onChange={(event) => setPictureZoom(Number(event.target.value))} className="min-w-0 flex-1 accent-[#0077E6]" />
+                      <span className="w-10 text-right text-sm tabular-nums text-slate-500">{pictureZoom.toFixed(1)}×</span>
+                      <button type="button" aria-label="Rotate left" onClick={() => setPictureRotation((value) => value - 90)} className="flex flex-col items-center gap-1 text-slate-800">
+                        <RotateCcw size={27} /><span className="text-xs">Left</span>
+                      </button>
+                      <button type="button" aria-label="Rotate right" onClick={() => setPictureRotation((value) => value + 90)} className="flex flex-col items-center gap-1 text-slate-800">
+                        <RotateCw size={27} /><span className="text-xs">Right</span>
+                      </button>
+                    </div>
+
+                    <div className="mx-auto mt-5 max-w-2xl">
+                      <h3 className="text-lg font-bold text-slate-900">Confirm that this is your best photo:</h3>
+                      <div className="mt-3 space-y-3">
+                        {["Do you look friendly and professional?", "Is your face visible and not cropped?", "Will this photo make clients hire you?"].map((label, index) => (
+                          <label key={label} className="flex cursor-pointer items-center gap-3 text-sm text-slate-700 sm:text-base">
+                            <input type="checkbox" checked={pictureConfirmations[index]} onChange={(event) => setPictureConfirmations((current) => current.map((value, item) => item === index ? event.target.checked : value))} className="h-5 w-5 accent-[#0077E6]" />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                      <p className="mt-4 text-sm text-slate-600">If you're unsure, re-upload a better photo.</p>
+                      <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row">
+                        <Button type="button" variant="outline" className="h-12 flex-1" onClick={closePictureEditor} disabled={processingPicture}>Cancel</Button>
+                        <Button type="button" className="h-12 flex-1 bg-[#0757D8] hover:bg-[#0649B5]" onClick={confirmProfilePicture} disabled={processingPicture || uploading.includes("picture") || pictureConfirmations.some((checked) => !checked)}>
+                          {processingPicture || uploading.includes("picture") ? <Loader2 size={17} className="mr-2 animate-spin" /> : <Upload size={17} className="mr-2" />}
+                          {processingPicture || uploading.includes("picture") ? "Uploading..." : "Upload"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Profile picture */}
 
               <Card>
@@ -2649,23 +3050,34 @@ export default function TutorOnboardingPage() {
                       }}
                       className="space-y-5"
                     >
-                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4">
-                        <input
-                          type="checkbox"
-                          checked={acceptNda}
-                          onChange={(event) =>
-                            setAcceptNda(event.target.checked)
-                          }
-                          className="mt-1 h-4 w-4 accent-[#1769D2]"
-                        />
-
-                        <span className="text-sm leading-6 text-slate-600">
-                          I have read and agree to the Tutova tutor
-                          non-disclosure agreement (NDA), including the
-                          confidentiality and safeguarding responsibilities
-                          applicable to tutors on the platform.
-                        </span>
-                      </label>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="font-semibold text-[#102A56]">Tutova Tutor Confidentiality and Safeguarding Agreement</h3>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">Version {ndaVersion}</span>
+                        </div>
+                        <div
+                          onScroll={(event) => {
+                            const element = event.currentTarget;
+                            if (element.scrollTop + element.clientHeight >= element.scrollHeight - 8) {
+                              setNdaScrolledToEnd(true);
+                            }
+                          }}
+                          className="max-h-[420px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-700 whitespace-pre-wrap"
+                        >
+                          {ndaContent || "Loading the current agreement…"}
+                        </div>
+                        {acceptNda ? (
+                          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                            <p className="font-semibold inline-flex items-center gap-2"><CheckCircle2 size={16}/> NDA accepted</p>
+                            <p className="mt-1">Your acceptance has been recorded{verification?.nda_accepted_at ? ` on ${new Date(verification.nda_accepted_at).toLocaleString()}` : ""}. You can continue to the referee section.</p>
+                          </div>
+                        ) : (
+                          <Button type="button" onClick={() => void acceptCurrentNda()} disabled={acceptingNda || !ndaContent || !ndaScrolledToEnd}>
+                            {acceptingNda ? <Loader2 size={16} className="mr-2 animate-spin"/> : <ShieldCheck size={16} className="mr-2"/>}
+                            {ndaScrolledToEnd ? "I have read and agree to the NDA" : "Scroll to the end to agree"}
+                          </Button>
+                        )}
+                      </div>
 
                       <div className="rounded-xl bg-slate-50 p-4">
                         <p className="text-sm font-semibold text-[#102A56]">
