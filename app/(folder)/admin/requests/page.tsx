@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/providers";
@@ -7,7 +8,536 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-type RequestRow={id:string;requester_user_id:string;learner_profile_id:string|null;subject_id:string;location_id:string|null;tutoring_mode:string;description:string;preferred_schedule:string|null;status:string;selected_tutor_id:string|null;assigned_tutor_id:string|null;accepted_at:string|null;created_at:string;};
-type Booking={id:string;tutoring_request_id:string;status:string;start_at:string;end_at:string;tutor_profile_id:string;requester_user_id:string;};
-type Payment={id:string;booking_id:string|null;monthly_arrangement_id:string|null;amount_minor:number;currency:string;status:string;paid_at:string|null;};
-export default function AdminRequestsPage(){const {user}=useAuth();const [requests,setRequests]=useState<RequestRow[]>([]);const [bookings,setBookings]=useState<Booking[]>([]);const [payments,setPayments]=useState<Payment[]>([]);const [loading,setLoading]=useState(true);const [busy,setBusy]=useState<string|null>(null);const [reviewNotes,setReviewNotes]=useState<Record<string,string>>({});async function load(){setLoading(true);try{const [r,b,p]=await Promise.all([api<RequestRow[]>("/tutoring-requests/admin"),api<Booking[]>("/session-bookings/admin?limit=300&offset=0"),api<Payment[]>("/payments/admin")]);setRequests(r);setBookings(b);setPayments(p);}catch(e){toast.error(e instanceof Error?e.message:"Could not load request workflow");}finally{setLoading(false);}}useEffect(()=>{if(user?.role==="ADMIN"||user?.role==="SUPER_ADMIN")void load();},[user]);if(user?.role!=="ADMIN"&&user?.role!=="SUPER_ADMIN")return <AppShell title="Admin requests"><p className="text-sm text-slate-500">Administrator access required.</p></AppShell>;return <AppShell title="Tutoring request oversight" description="Monitor direct tutor requests, generic matching requests, selected tutors and the lesson bookings that follow them."><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-slate-500">{requests.length} requests · {bookings.length} bookings · {payments.length} payments</p><Button variant="outline" onClick={()=>void load()}>Refresh</Button></div><div className="space-y-3">{requests.map(r=>{const linked=bookings.filter(b=>b.tutoring_request_id===r.id);return <Card key={r.id}><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle>Request {r.id.slice(0,8)}</CardTitle><Badge>{r.status}</Badge></div><p className="text-xs text-slate-500">Submitted {new Date(r.created_at).toLocaleString("en-NG")} · {r.tutoring_mode.replaceAll("_"," ")} · Requester {r.requester_user_id.slice(0,8)}</p></CardHeader><CardContent className="space-y-2 text-sm"><p><strong>Subject ID:</strong> {r.subject_id}</p><p><strong>Description:</strong> {r.description}</p><p><strong>Preferred schedule:</strong> {r.preferred_schedule||"Not supplied"}</p><p><strong>Request type:</strong> {r.selected_tutor_id?"Direct tutor request":"Generic tutor matching"}</p><p><strong>Selected tutor profile:</strong> {r.selected_tutor_id||"Not selected"}</p><p><strong>Assigned tutor profile:</strong> {r.assigned_tutor_id||"Not assigned"}</p><div className="border-t pt-3"><p className="font-semibold">Related lesson bookings ({linked.length})</p>{linked.length?linked.map(b=><div key={b.id} className="mt-2 rounded-lg bg-slate-50 p-3"><div className="flex flex-wrap justify-between gap-2"><span>{new Date(b.start_at).toLocaleString("en-NG")} – {new Date(b.end_at).toLocaleTimeString("en-NG")}</span><div className="flex items-center gap-2"><Badge>{b.status}</Badge>{payments.filter(p=>p.booking_id===b.id).map(p=><Badge key={p.id} className="bg-white text-slate-700">{p.status} · {(p.amount_minor/100).toLocaleString("en-NG",{style:"currency",currency:p.currency||"NGN"})}</Badge>)}</div></div>{b.status==="DISPUTED"&&<div className="mt-3 space-y-2"><textarea className="w-full rounded-lg border border-slate-300 p-2 text-sm" rows={2} placeholder="Record the admin review and resolution" value={reviewNotes[b.id]||""} onChange={e=>setReviewNotes(v=>({...v,[b.id]:e.target.value}))}/><div className="flex flex-wrap gap-2"><Button size="sm" disabled={busy===b.id||!(reviewNotes[b.id]||"").trim()} onClick={async()=>{setBusy(b.id);try{await api(`/session-bookings/admin/${b.id}/resolve-dispute`,{method:"POST",body:JSON.stringify({resolution:"RETURN_TO_LEARNER_ACKNOWLEDGEMENT",notes:reviewNotes[b.id]})});toast.success("Dispute reviewed. Learner acknowledgement is still required.");await load();}catch(e){toast.error(e instanceof Error?e.message:"Could not resolve dispute");}finally{setBusy(null);}}}>Return for learner acknowledgement</Button><Button size="sm" variant="outline" disabled={busy===b.id||!(reviewNotes[b.id]||"").trim()} onClick={async()=>{setBusy(b.id);try{await api(`/session-bookings/admin/${b.id}/resolve-dispute`,{method:"POST",body:JSON.stringify({resolution:"CANCEL_BOOKING",notes:reviewNotes[b.id]})});toast.success("Booking cancelled after admin review.");await load();}catch(e){toast.error(e instanceof Error?e.message:"Could not cancel booking");}finally{setBusy(null);}}}>Cancel booking</Button></div></div>}</div>):<p className="mt-1 text-xs text-slate-500">No lesson booking has been created yet.</p>}</div></CardContent></Card>})}{!loading&&!requests.length&&<Card><CardContent className="p-6 text-sm text-slate-500">No tutoring requests found.</CardContent></Card>}{loading&&<p className="py-6 text-sm text-slate-500">Loading requests…</p>}</div></AppShell>}
+import {
+  CalendarClock,
+  Clock3,
+  GraduationCap,
+  MapPin,
+  RefreshCw,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
+
+type RequestRow = {
+  id: string;
+  requester_user_id: string;
+  requester_name: string;
+  requester_role: string;
+  learner_profile_id: string | null;
+  subject_id: string;
+  subject_name: string | null;
+  location_id: string | null;
+  tutoring_mode: string;
+  description: string;
+  preferred_schedule: string | null;
+  status: string;
+  selected_tutor_id: string | null;
+  assigned_tutor_id: string | null;
+  tutor_profile_id: string | null;
+  tutor_name: string | null;
+  tutor_profile_picture_url: string | null;
+  accepted_at: string | null;
+  created_at: string;
+};
+
+type Booking = {
+  id: string;
+  tutoring_request_id: string;
+  status: string;
+  start_at: string;
+  end_at: string;
+  tutor_profile_id: string;
+  requester_user_id: string;
+};
+
+type Payment = {
+  id: string;
+  booking_id: string | null;
+  monthly_arrangement_id: string | null;
+  amount_minor: number;
+  currency: string;
+  status: string;
+  paid_at: string | null;
+};
+
+function statusClass(status: string) {
+  switch (status.toUpperCase()) {
+    case "ACCEPTED":
+    case "CONFIRMED":
+    case "PAID":
+    case "COMPLETED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "OPEN":
+    case "PENDING":
+    case "PENDING_CONFIRMATION":
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case "DISPUTED":
+    case "CANCELLED":
+    case "DECLINED":
+    case "FAILED":
+      return "border-rose-200 bg-rose-50 text-rose-700";
+    default:
+      return "border-slate-200 bg-slate-100 text-slate-700";
+  }
+}
+
+function StatusBadge({ status }: { status: string }) {
+  return (
+    <Badge
+      className={`rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide ${statusClass(status)}`}
+    >
+      {status.replaceAll("_", " ")}
+    </Badge>
+  );
+}
+
+function PersonBlock({
+  name,
+  subtitle,
+  imageUrl,
+  kind,
+}: {
+  name: string | null | undefined;
+  subtitle: string;
+  imageUrl?: string | null;
+  kind: "tutor" | "requester";
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <div
+        className={`relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full ring-4 ${
+          kind === "tutor"
+            ? "bg-[#eaf3ff] text-[#245a9b] ring-[#f1f6fc]"
+            : "bg-[#e8f7f4] text-[#087e72] ring-[#f0faf8]"
+        }`}
+      >
+        {imageUrl ? (
+          // The URL is generated by the backend's existing Cloudinary helper.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt={`${name || "Tutor"} profile`}
+            className="h-full w-full object-cover"
+          />
+        ) : kind === "tutor" ? (
+          <GraduationCap className="h-5 w-5" />
+        ) : (
+          <UserRound className="h-5 w-5" />
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-900">
+          {name ||
+            (kind === "tutor" ? "Tutor not assigned yet" : "Name unavailable")}
+        </p>
+        <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminRequestsPage() {
+  const { user } = useAuth();
+  const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [requestRows, bookingRows, paymentRows] = await Promise.all([
+        api<RequestRow[]>("/tutoring-requests/admin"),
+        api<Booking[]>("/session-bookings/admin?limit=300&offset=0"),
+        api<Payment[]>("/payments/admin"),
+      ]);
+      setRequests(requestRows);
+      setBookings(bookingRows);
+      setPayments(paymentRows);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not load request workflow",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") void load();
+  }, [user]);
+
+  if (user?.role !== "ADMIN" && user?.role !== "SUPER_ADMIN") {
+    return (
+      <AppShell title="Admin requests">
+        <p className="text-sm text-slate-500">Administrator access required.</p>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell
+      title="Tutoring request oversight"
+      description="Review learner requests, tutor assignments, lesson bookings and related payments from one place."
+    >
+      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            Request workflow
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            A live overview of tutoring activity across Tutova.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="rounded-xl bg-slate-50 px-3 py-2 text-center">
+            <p className="text-lg font-bold text-slate-900">
+              {requests.length}
+            </p>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
+              Requests
+            </p>
+          </div>
+          <div className="rounded-xl bg-slate-50 px-3 py-2 text-center">
+            <p className="text-lg font-bold text-slate-900">
+              {bookings.length}
+            </p>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
+              Bookings
+            </p>
+          </div>
+          <div className="rounded-xl bg-slate-50 px-3 py-2 text-center">
+            <p className="text-lg font-bold text-slate-900">
+              {payments.length}
+            </p>
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
+              Payments
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => void load()}
+            disabled={loading}
+            className="h-10 rounded-xl"
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        {requests.map((request) => {
+          const linkedBookings = bookings.filter(
+            (booking) => booking.tutoring_request_id === request.id,
+          );
+          const requesterType =
+            request.requester_role === "ADULT_LEARNER"
+              ? "Adult learner"
+              : "Parent";
+          const tutorSubtitle = request.assigned_tutor_id
+            ? "Assigned tutor"
+            : request.selected_tutor_id
+              ? "Selected tutor · awaiting acceptance"
+              : "Tutor matching in progress";
+
+          return (
+            <Card
+              key={request.id}
+              className="overflow-hidden rounded-2xl border-slate-200/80 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <CardHeader className="space-y-4 border-b border-slate-100 bg-gradient-to-r from-white to-slate-50/70 px-5 py-5 sm:px-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle className="text-base font-bold text-slate-900">
+                        Tutoring request
+                      </CardTitle>
+                      <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-500">
+                        #{request.id.slice(0, 8).toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      Submitted{" "}
+                      {new Date(request.created_at).toLocaleString("en-NG")}
+                    </p>
+                  </div>
+                  <StatusBadge status={request.status} />
+                </div>
+
+                <div className="grid gap-4 rounded-xl border border-slate-100 bg-white p-4 sm:grid-cols-2">
+                  <PersonBlock
+                    name={request.requester_name}
+                    subtitle={`${requesterType} · Requester`}
+                    kind="requester"
+                  />
+                  <PersonBlock
+                    name={request.tutor_name}
+                    subtitle={tutorSubtitle}
+                    imageUrl={request.tutor_profile_picture_url}
+                    kind="tutor"
+                  />
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-5 px-5 py-5 sm:px-6">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                      <GraduationCap className="h-4 w-4" /> Subject
+                    </div>
+                    <p className="mt-1.5 text-sm font-semibold text-slate-900">
+                      {request.subject_name || "Subject details unavailable"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                      <MapPin className="h-4 w-4" /> Tutoring mode
+                    </div>
+                    <p className="mt-1.5 text-sm font-semibold capitalize text-slate-900">
+                      {request.tutoring_mode.replaceAll("_", " ").toLowerCase()}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                      <CalendarClock className="h-4 w-4" /> Preferred schedule
+                    </div>
+                    <p className="mt-1.5 text-sm font-semibold text-slate-900">
+                      {request.preferred_schedule || "Not supplied"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Learning requirements
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                    {request.description}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500">
+                  <UsersRound className="h-4 w-4" />
+                  {request.selected_tutor_id
+                    ? "Direct tutor request"
+                    : "General tutor matching"}
+                  <span className="text-slate-300">•</span>
+                  {request.assigned_tutor_id
+                    ? "Tutor assigned"
+                    : "No accepted tutor assignment yet"}
+                </div>
+
+                <div className="border-t border-slate-100 pt-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        Lesson bookings
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Bookings created from this request
+                      </p>
+                    </div>
+                    <Badge className="rounded-full bg-slate-100 text-slate-700">
+                      {linkedBookings.length}{" "}
+                      {linkedBookings.length === 1 ? "booking" : "bookings"}
+                    </Badge>
+                  </div>
+
+                  {linkedBookings.length ? (
+                    <div className="space-y-3">
+                      {linkedBookings.map((booking) => {
+                        const bookingPayments = payments.filter(
+                          (payment) => payment.booking_id === booking.id,
+                        );
+                        return (
+                          <div
+                            key={booking.id}
+                            className="rounded-xl border border-slate-200 bg-white p-4"
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                                  <Clock3 className="h-4 w-4 text-slate-400" />
+                                  {new Date(booking.start_at).toLocaleString(
+                                    "en-NG",
+                                  )}
+                                </div>
+                                <p className="mt-1 pl-6 text-xs text-slate-500">
+                                  Ends{" "}
+                                  {new Date(booking.end_at).toLocaleTimeString(
+                                    "en-NG",
+                                  )}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <StatusBadge status={booking.status} />
+                                {bookingPayments.map((payment) => (
+                                  <Badge
+                                    key={payment.id}
+                                    className="rounded-full border-slate-200 bg-slate-50 px-3 py-1 text-[11px] text-slate-700"
+                                  >
+                                    {payment.status} ·{" "}
+                                    {(
+                                      payment.amount_minor / 100
+                                    ).toLocaleString("en-NG", {
+                                      style: "currency",
+                                      currency: payment.currency || "NGN",
+                                    })}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+
+                            {booking.status === "DISPUTED" && (
+                              <div className="mt-4 space-y-3 rounded-xl bg-rose-50/60 p-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-rose-900">
+                                    Dispute requires review
+                                  </p>
+                                  <p className="mt-0.5 text-xs text-rose-700">
+                                    Record your review notes before choosing an
+                                    outcome.
+                                  </p>
+                                </div>
+                                <textarea
+                                  className="w-full rounded-lg border border-rose-200 bg-white p-3 text-sm outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                                  rows={3}
+                                  placeholder="Record the admin review and resolution"
+                                  value={reviewNotes[booking.id] || ""}
+                                  onChange={(event) =>
+                                    setReviewNotes((current) => ({
+                                      ...current,
+                                      [booking.id]: event.target.value,
+                                    }))
+                                  }
+                                />
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    size="sm"
+                                    className="rounded-lg"
+                                    disabled={
+                                      busy === booking.id ||
+                                      !(reviewNotes[booking.id] || "").trim()
+                                    }
+                                    onClick={async () => {
+                                      setBusy(booking.id);
+                                      try {
+                                        await api(
+                                          `/session-bookings/admin/${booking.id}/resolve-dispute`,
+                                          {
+                                            method: "POST",
+                                            body: JSON.stringify({
+                                              resolution:
+                                                "RETURN_TO_LEARNER_ACKNOWLEDGEMENT",
+                                              notes: reviewNotes[booking.id],
+                                            }),
+                                          },
+                                        );
+                                        toast.success(
+                                          "Dispute reviewed. Learner acknowledgement is still required.",
+                                        );
+                                        await load();
+                                      } catch (error) {
+                                        toast.error(
+                                          error instanceof Error
+                                            ? error.message
+                                            : "Could not resolve dispute",
+                                        );
+                                      } finally {
+                                        setBusy(null);
+                                      }
+                                    }}
+                                  >
+                                    Return for learner acknowledgement
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-lg border-rose-200 bg-white text-rose-700 hover:bg-rose-100"
+                                    disabled={
+                                      busy === booking.id ||
+                                      !(reviewNotes[booking.id] || "").trim()
+                                    }
+                                    onClick={async () => {
+                                      setBusy(booking.id);
+                                      try {
+                                        await api(
+                                          `/session-bookings/admin/${booking.id}/resolve-dispute`,
+                                          {
+                                            method: "POST",
+                                            body: JSON.stringify({
+                                              resolution: "CANCEL_BOOKING",
+                                              notes: reviewNotes[booking.id],
+                                            }),
+                                          },
+                                        );
+                                        toast.success(
+                                          "Booking cancelled after admin review.",
+                                        );
+                                        await load();
+                                      } catch (error) {
+                                        toast.error(
+                                          error instanceof Error
+                                            ? error.message
+                                            : "Could not cancel booking",
+                                        );
+                                      } finally {
+                                        setBusy(null);
+                                      }
+                                    }}
+                                  >
+                                    Cancel booking
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5 text-center">
+                      <CalendarClock className="mx-auto h-5 w-5 text-slate-400" />
+                      <p className="mt-2 text-sm font-medium text-slate-600">
+                        No lesson booking yet
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        A booking will appear here once a session is scheduled.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+
+        {!loading && requests.length === 0 && (
+          <Card className="rounded-2xl border-dashed border-slate-300 shadow-none">
+            <CardContent className="px-6 py-12 text-center">
+              <UsersRound className="mx-auto h-8 w-8 text-slate-300" />
+              <p className="mt-3 text-sm font-semibold text-slate-800">
+                No tutoring requests found
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                New parent and adult learner requests will appear here.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        {loading && (
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-500">
+            Loading tutoring requests…
+          </div>
+        )}
+      </div>
+    </AppShell>
+  );
+}
