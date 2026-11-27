@@ -12,6 +12,7 @@ import { api, uploadWithProgress } from "@/lib/api";
 import type { Subject, Location } from "@/lib/types";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   Camera,
   Check,
   CheckCircle2,
@@ -20,6 +21,7 @@ import {
   FileText,
   Loader2,
   MapPin,
+  Pencil,
   Plus,
   Search,
   ShieldCheck,
@@ -95,6 +97,7 @@ type VerificationResponse = {
 type RefereeStatus = "PENDING" | "CONSENTED" | "DECLINED" | "EXPIRED";
 type TutorReferee = {
   id: string;
+  supersedes_referee_id?: string | null;
   full_name: string;
   email: string;
   job_title: string;
@@ -115,6 +118,15 @@ const EMPTY_REFEREE: RefereeDraft = {
   job_title: "",
   relationship_to_tutor: "",
 };
+
+function getCurrentRefereeRecords(records: TutorReferee[]): TutorReferee[] {
+  const supersededIds = new Set(
+    records
+      .map((record) => record.supersedes_referee_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  return records.filter((record) => !supersededIds.has(record.id));
+}
 
 type UploadResponse = {
   message?: string;
@@ -1045,6 +1057,9 @@ export default function TutorOnboardingPage() {
     null,
   );
   const [referees, setReferees] = useState<TutorReferee[]>([]);
+  const [updatingRefereeEmailId, setUpdatingRefereeEmailId] = useState<
+    string | null
+  >(null);
   const [refereeDrafts, setRefereeDrafts] = useState<RefereeDraft[]>([
     { ...EMPTY_REFEREE },
     { ...EMPTY_REFEREE },
@@ -1606,7 +1621,7 @@ export default function TutorOnboardingPage() {
         setReferees(refereeResult.value);
         if (refereeResult.value.length) {
           setRefereeDrafts(
-            refereeResult.value.map((item) => ({
+            getCurrentRefereeRecords(refereeResult.value).map((item) => ({
               full_name: item.full_name,
               email: item.email,
               job_title: item.job_title,
@@ -2252,8 +2267,8 @@ export default function TutorOnboardingPage() {
         item.course_of_study.trim() &&
         item.start_date &&
         item.qualification_type &&
-        (item.currently_enrolled ||
-          (item.end_date && item.grade.trim() && item.document_public_id)),
+        item.document_public_id &&
+        (item.currently_enrolled || item.end_date),
     );
     const validCertifications = certifications.filter((item) =>
       item.name.trim(),
@@ -2312,78 +2327,8 @@ export default function TutorOnboardingPage() {
   /* Step 1: Save profile                                                     */
   /* ------------------------------------------------------------------------ */
 
-  async function saveProfile(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
-
-    // Step 1 is the gate to verification. Validate the complete required
-    // profile before allowing either the form button or the step indicator
-    // to move the tutor forward. Draft autosaving remains unaffected.
-    if (subjectIds.length === 0) {
-      toast.error("Select at least one subject or learning area you teach.");
-      return;
-    }
-
-    if (education.length === 0) {
-      toast.error("Add at least one education record before continuing.");
-      return;
-    }
-
-    for (let index = 0; index < education.length; index += 1) {
-      const item = education[index];
-      const label = `Education ${index + 1}`;
-
-      if (!item.institution_name.trim()) {
-        toast.error(
-          `${label}: enter the institution name or suggest it for approval.`,
-        );
-        return;
-      }
-      if (!item.country_code.trim()) {
-        toast.error(`${label}: select the institution's country.`);
-        return;
-      }
-      if (!item.course_of_study.trim()) {
-        toast.error(`${label}: enter your course of study.`);
-        return;
-      }
-      if (!item.qualification_type.trim()) {
-        toast.error(`${label}: select your qualification or programme.`);
-        return;
-      }
-      if (!item.start_date) {
-        toast.error(`${label}: select the date you started.`);
-        return;
-      }
-      if (!item.currently_enrolled && !item.end_date) {
-        toast.error(
-          `${label}: select the completion date or mark yourself as currently enrolled.`,
-        );
-        return;
-      }
-      if (item.end_date && item.start_date && item.end_date < item.start_date) {
-        toast.error(
-          `${label}: the end date cannot be earlier than the start date.`,
-        );
-        return;
-      }
-      if (!item.currently_enrolled && !item.grade.trim()) {
-        toast.error(`${label}: enter your grade or result.`);
-        return;
-      }
-      if (!item.currently_enrolled && !item.document_public_id) {
-        toast.error(
-          `${label}: upload your certificate of completion or statement of result.`,
-        );
-        return;
-      }
-    }
-
-    if (backgroundUploading.length > 0) {
-      toast.error(
-        "Wait for your education or certification uploads to finish before continuing.",
-      );
-      return;
-    }
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
     const normalizedPhone = phoneNumber.trim();
 
@@ -2604,6 +2549,22 @@ export default function TutorOnboardingPage() {
       toast.error("Each referee must have a different email address.");
       return;
     }
+
+    const refereeSummary = refereeDrafts
+      .map(
+        (item, index) =>
+          `${index + 1}. ${item.full_name.trim()}\n   Email: ${item.email.trim()}\n   Occupation: ${item.job_title.trim()}\n   Relationship: ${item.relationship_to_tutor.trim()}`,
+      )
+      .join("\n\n");
+    const confirmed = window.confirm(
+      `Please cross-check every referee detail before sending.\n\n` +
+        `${refereeSummary}\n\n` +
+        `Referee invitations will be sent to these exact email addresses. ` +
+        `If an address is incorrect, choose Cancel and edit it first. ` +
+        `Continue and send the invitations?`,
+    );
+    if (!confirmed) return;
+
     setBusy(true);
     try {
       const result = await api<TutorReferee[]>("/verification/tutor/referees", {
@@ -2621,6 +2582,50 @@ export default function TutorOnboardingPage() {
     }
   }
 
+  async function correctRefereeEmail(referee: TutorReferee) {
+    const nextEmail = window.prompt(
+      `Enter the correct email address for ${referee.full_name}:`,
+      referee.email,
+    );
+    if (nextEmail === null) return;
+    const normalizedEmail = nextEmail.trim().toLowerCase();
+    if (!normalizedEmail || normalizedEmail === referee.email.toLowerCase())
+      return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Send a new referee consent invitation to ${normalizedEmail}? The previous link will be invalidated. If the referee has already responded, that response will be retained in Tutova's audit history and a new response will be required.`,
+      )
+    )
+      return;
+
+    setUpdatingRefereeEmailId(referee.id);
+    try {
+      const updated = await api<TutorReferee>(
+        `/verification/tutor/referees/${referee.id}/email`,
+        { method: "PATCH", body: JSON.stringify({ email: normalizedEmail }) },
+      );
+      setReferees((current) => {
+        const exists = current.some((item) => item.id === updated.id);
+        return exists
+          ? current.map((item) => (item.id === updated.id ? updated : item))
+          : [...current, updated];
+      });
+      toast.success(
+        `A fresh consent invitation has been sent to ${updated.email}.`,
+      );
+    } catch (error) {
+      toast.error(
+        getErrorMessage(error, "Could not update the referee email."),
+      );
+    } finally {
+      setUpdatingRefereeEmailId(null);
+    }
+  }
+
   async function refreshReferees() {
     setBusy(true);
     try {
@@ -2628,7 +2633,7 @@ export default function TutorOnboardingPage() {
       setReferees(result);
       setRefereeDrafts(
         result.length
-          ? result.map((item) => ({
+          ? getCurrentRefereeRecords(result).map((item) => ({
               full_name: item.full_name,
               email: item.email,
               job_title: item.job_title,
@@ -2673,19 +2678,10 @@ export default function TutorOnboardingPage() {
           <StepIndicator
             currentStep={currentStep}
             onStepChange={(step) => {
-              if (step === 2) {
-                // Never let the step indicator bypass Step 1 validation or
-                // skip saving the latest edits. Reuse the same submit path.
-                if (currentStep === 1) {
-                  void saveProfile();
-                } else if (!exists) {
-                  toast.error(
-                    "Save your tutor profile before continuing to Stage 2.",
-                  );
-                  setCurrentStep(1);
-                } else {
-                  setCurrentStep(2);
-                }
+              if (step === 2 && !exists) {
+                toast.error(
+                  "Save your tutor profile before continuing to Stage 2.",
+                );
                 return;
               }
               if (step === 3 && !stage2Completed) {
@@ -2793,20 +2789,13 @@ export default function TutorOnboardingPage() {
 
                     <section className="space-y-4 border-t border-slate-100 pt-6">
                       <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold text-[#102A56]">
-                            Education history{" "}
-                            <span className="text-red-600">*</span>
-                          </h3>
-                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            Required to continue
-                          </span>
-                        </div>
+                        <h3 className="font-semibold text-[#102A56]">
+                          Education history
+                        </h3>
                         <p className="text-sm text-slate-500">
-                          Add at least one institution and programme. For
-                          completed qualifications, upload a certificate of
-                          completion or statement of result. If you are still
-                          enrolled, select “Currently enrolled”.
+                          Add the institutions and programmes you have attended.
+                          Upload a certificate of completion or statement of
+                          result for each completed qualification.
                         </p>
                       </div>
                       {education.map((item, index) => (
@@ -2835,7 +2824,7 @@ export default function TutorOnboardingPage() {
                             </Button>
                           </div>
                           <div className="grid gap-3 sm:grid-cols-2">
-                            <Field label="Institution name *">
+                            <Field label="Institution name">
                               <Input
                                 value={item.institution_name}
                                 placeholder="Search or enter institution"
@@ -2904,7 +2893,7 @@ export default function TutorOnboardingPage() {
                                 Can’t find it? Suggest this institution
                               </button>
                             </Field>
-                            <Field label="Country *">
+                            <Field label="Country">
                               <select
                                 className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                                 value={item.country_code}
@@ -2929,7 +2918,7 @@ export default function TutorOnboardingPage() {
                                 ))}
                               </select>
                             </Field>
-                            <Field label="Course of study *">
+                            <Field label="Course of study">
                               <Input
                                 value={item.course_of_study}
                                 onChange={(e) =>
@@ -2962,7 +2951,7 @@ export default function TutorOnboardingPage() {
                                 placeholder="Optional"
                               />
                             </Field>
-                            <Field label="Qualification / programme *">
+                            <Field label="Qualification / programme">
                               <div className="space-y-2">
                                 <select
                                   className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
@@ -3016,13 +3005,7 @@ export default function TutorOnboardingPage() {
                                 )}
                               </div>
                             </Field>
-                            <Field
-                              label={
-                                item.currently_enrolled
-                                  ? "Grade / result (if available)"
-                                  : "Grade / result *"
-                              }
-                            >
+                            <Field label="Grade / result">
                               <Input
                                 value={item.grade}
                                 onChange={(e) =>
@@ -3037,7 +3020,7 @@ export default function TutorOnboardingPage() {
                                 placeholder="e.g. Second Class Upper, 4.2/5.0"
                               />
                             </Field>
-                            <Field label="From *">
+                            <Field label="From">
                               <Input
                                 type="date"
                                 value={item.start_date}
@@ -3052,13 +3035,7 @@ export default function TutorOnboardingPage() {
                                 }
                               />
                             </Field>
-                            <Field
-                              label={
-                                item.currently_enrolled
-                                  ? "To (if completed)"
-                                  : "To *"
-                              }
-                            >
+                            <Field label="To">
                               <Input
                                 type="date"
                                 disabled={item.currently_enrolled}
@@ -3097,13 +3074,7 @@ export default function TutorOnboardingPage() {
                             />{" "}
                             Currently enrolled
                           </label>
-                          <Field
-                            label={
-                              item.currently_enrolled
-                                ? "Certificate / statement of result (if available)"
-                                : "Certificate of completion / statement of result *"
-                            }
-                          >
+                          <Field label="Certificate of completion / statement of result">
                             <Input
                               type="file"
                               accept=".pdf,.jpg,.jpeg,.png"
@@ -3641,7 +3612,7 @@ export default function TutorOnboardingPage() {
                           </h3>
                           <p className="mt-1 text-sm text-slate-500">
                             Search and select the subjects, skills or learning
-                            areas you offer. At least one selection is required.
+                            areas you offer.
                           </p>
                         </div>
 
@@ -3992,10 +3963,7 @@ export default function TutorOnboardingPage() {
                       <Button
                         type="submit"
                         disabled={
-                          busy ||
-                          uploading.length > 0 ||
-                          backgroundUploading.length > 0 ||
-                          creatingCommunity
+                          busy || uploading.length > 0 || creatingCommunity
                         }
                         className="w-full sm:w-auto"
                       >
@@ -4465,23 +4433,48 @@ export default function TutorOnboardingPage() {
 
           {currentStep === 3 && (
             <div className="space-y-6">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-[#1769D2]">
-                  Stage 3 of 3
-                </p>
-                <h2 className="mt-1 text-xl font-bold text-[#102A56]">
-                  Provide at least two referees
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Provide at least two people who can verify your professional
-                  or personal background. Tutova emails each referee a unique,
-                  secure link. They do not need a Tutova account. Your
-                  application remains pending while Tutova reviews the
-                  responses.
-                </p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#1769D2]">
+                    Stage 3 of 3
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold text-[#102A56]">
+                    Provide at least two referees
+                  </h2>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                    Provide at least two people who can verify your professional
+                    or personal background. Tutova emails each referee a unique,
+                    secure link. They do not need a Tutova account. Your
+                    application remains pending while Tutova reviews the
+                    responses.
+                  </p>
+                </div>
+                <div
+                  role="alert"
+                  className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950"
+                >
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      Important: double-check your referee details
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-amber-900">
+                      Check each referee's full name, email address, occupation
+                      and relationship carefully. If you discover an email error
+                      after submitting your application, use the email
+                      correction control in the response-status list below.
+                      Tutova will send a fresh consent link to the corrected
+                      address.
+                    </p>
+                    <p className="mt-2 text-xs font-medium text-amber-800">
+                      Correcting an email does not resubmit your application or
+                      change the other submitted verification details.
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <Card>
+              <Card className="overflow-hidden border-slate-200 shadow-sm">
                 <CardHeader>
                   <CardTitle>Referee details</CardTitle>
                 </CardHeader>
@@ -4490,7 +4483,7 @@ export default function TutorOnboardingPage() {
                     {refereeDrafts.map((referee, index) => (
                       <div
                         key={index}
-                        className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-2"
+                        className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5 md:grid-cols-2"
                       >
                         <div className="md:col-span-2 flex items-center justify-between">
                           <p className="text-sm font-semibold text-[#102A56]">
@@ -4536,6 +4529,7 @@ export default function TutorOnboardingPage() {
                             type="email"
                             value={referee.email}
                             disabled={verificationIsLocked}
+                            aria-describedby={`referee-email-help-${index}`}
                             onChange={(event) =>
                               setRefereeDrafts((current) =>
                                 current.map((item, i) =>
@@ -4547,6 +4541,15 @@ export default function TutorOnboardingPage() {
                             }
                             placeholder="name@example.com"
                           />
+                          {!verificationIsLocked && (
+                            <p
+                              id={`referee-email-help-${index}`}
+                              className="mt-1.5 text-xs leading-5 text-slate-500"
+                            >
+                              Check spelling carefully. You can edit this
+                              address if it was entered incorrectly.
+                            </p>
+                          )}
                         </Field>
                         <Field label="Job title / occupation">
                           <Input
@@ -4624,8 +4627,8 @@ export default function TutorOnboardingPage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
+              <Card className="overflow-hidden border-slate-200 shadow-sm">
+                <CardHeader className="border-b border-slate-100 bg-slate-50/70">
                   <CardTitle>Referee response status</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -4647,12 +4650,37 @@ export default function TutorOnboardingPage() {
                             {referee.email} · {referee.job_title} ·{" "}
                             {referee.relationship_to_tutor}
                           </p>
+                          {referee.supersedes_referee_id && (
+                            <p className="mt-1 text-xs font-medium text-blue-700">
+                              Replacement invitation — previous response
+                              retained for audit
+                            </p>
+                          )}
                         </div>
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${referee.status === "CONSENTED" ? "bg-emerald-50 text-emerald-700" : referee.status === "DECLINED" || referee.status === "EXPIRED" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}
-                        >
-                          {referee.status.replaceAll("_", " ")}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${referee.status === "CONSENTED" ? "bg-emerald-50 text-emerald-700" : referee.status === "DECLINED" || referee.status === "EXPIRED" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}
+                          >
+                            {referee.status.replaceAll("_", " ")}
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || updatingRefereeEmailId !== null}
+                            onClick={() => void correctRefereeEmail(referee)}
+                          >
+                            {updatingRefereeEmailId === referee.id ? (
+                              <Loader2
+                                size={14}
+                                className="mr-1 animate-spin"
+                              />
+                            ) : (
+                              <Pencil size={14} className="mr-1" />
+                            )}
+                            Edit email
+                          </Button>
+                        </div>
                       </div>
                     ))
                   )}
